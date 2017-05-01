@@ -11,6 +11,8 @@ edsby = Edsby(host='your_edsbyhost.edsby.com', username='your_username', passwor
 print json.dumps( edsby.getAllClassAverages() )
 ```
 
+Check out [example.py](https://github.com/ctrezevant/PyEdsby/blob/master/example.py) for a more comprehensive example.
+
 ## Getting Started
 
 Everything you need to know is explained comprehensively in the [Wiki](https://github.com/ctrezevant/PyEdsby/wiki). If you have any questions, feel free to [open an issue](https://github.com/ctrezevant/PyEdsby/issues/new) or [send me an email](https://www.ctis.me). Definitely check that documentation out first, though, because it's pretty extensive.
