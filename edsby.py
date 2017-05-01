@@ -60,7 +60,7 @@ class Edsby(object):
     """
         Returns the HTTP headers currently in use for all API calls
     """
-    def getHeaders(self, headers):
+    def getHeaders(self):
         return self.globalHeaders
 
     """
@@ -353,7 +353,12 @@ class Edsby(object):
         Say hi to your classmates!
     """
     def getClassmates(self, classNID):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=ClassStudentList',cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()['slices'][0]['data']['places']['item']
+        classMates = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=ClassStudentList',cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()
+        if 'slices' in classMates: # Make sure we got a valid response from the API.
+            if 'places' in classMates['slices'][0]['data'] and 'item' in classMates['slices'][0]['data']['places']:
+                return classMates['slices'][0]['data']['places']['item']
+        else:
+            return ''
 
     """
         Retrieves the feed of all assignments and messages posted in the class
