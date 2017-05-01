@@ -1,7 +1,7 @@
 import requests, json
 
 """
-    Edsby.py: An API wrapper/library for Python - v0.1
+    Edsby.py: An API wrapper/library for Python - v0.2
     https://github.com/ctrezevant/PyEdsby/
 
     (c) 2017 Charlton Trezevant - www.ctis.me
@@ -25,6 +25,18 @@ class Edsby(object):
                 'dnt': '1',
                 'x-requested-with':'XMLHttpRequest'
             }
+
+        if 'username' in kwargs and 'password' in kwargs:
+            self.login(username=kwargs['username'], password=kwargs['password'])
+
+        if 'cookies' in kwargs:
+            self.setCookies(kwargs['cookies'])
+
+        if 'headers' in kwargs:
+            self.setHeaders(kwargs['headers'])
+
+        if 'studentData' in kwargs:
+            self.setStudentData(kwargs['studentData'])
 
     """
         Authenticates the session, retrieves student metadata, and
