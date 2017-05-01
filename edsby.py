@@ -5,6 +5,7 @@ import requests, json
     https://github.com/ctrezevant/PyEdsby/
 
     (c) 2017 Charlton Trezevant - www.ctis.me
+    MIT License
 
     The Edsby trademark and brand are property of CoreFour, Inc.
     This software is unofficial and not supported by CoreFour in any way.
