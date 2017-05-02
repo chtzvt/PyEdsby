@@ -1,11 +1,15 @@
 import requests, json
 
 """
-    Edsby.py: An API wrapper/library for Python - v0.4
+    Edsby.py: An API wrapper/library for Python - v0.5
     https://github.com/ctrezevant/PyEdsby/
 
     (c) 2017 Charlton Trezevant - www.ctis.me
     MIT License
+
+    This code is well documented. You can find supplementary
+    documentation, as well as the documentation included here
+    in the PyEdsby wiki: https://github.com/ctrezevant/PyEdsby/wiki
 
     The Edsby trademark and brand are property of CoreFour, Inc.
     This software is unofficial and not supported by CoreFour in any way.
@@ -40,15 +44,12 @@ class Edsby(object):
             self.setStudentData(kwargs['studentData'])
 
     """
-        Authenticates the session, retrieves student metadata, and
-        hits required API endpoints (the Edsby API is stateful, so some things must
-        be done in a certain order, before others)
+        Authenticates the session and retrieves student metadata
     """
     def login(self, **kwargs):
         self.session = self.getSession()
         self.authData = self.getauthData((kwargs['username'], kwargs['password']))
         self.studentData = self.sendAuthenticationData()
-        self.getBaseStudentData()  # Seems like I have to hit this endpoint before calling many of the methods available
         return True
 
     """
@@ -158,7 +159,7 @@ class Edsby(object):
         return requests.get('https://'+self.edsbyHost+'/core/node.json/?xds=bootstrap',cookies=self.getCookies(),headers=self.getHeaders()).json()
 
     """
-        This is another required API call, which returns a wealth of metadata about the student as a whole,
+        This returns a wealth of metadata about the student as a whole,
         including classes. This is yet another thing I haven't explored in great detail.
     """
     def getBaseStudentData(self):
@@ -180,7 +181,87 @@ class Edsby(object):
         return userSettings['data'] if 'data' in userSettings else ''
 
     """
-        Returns raw class data, which looks like:
+        Returns raw class data for only the current set of enrolled classes, which looks like:
+
+        "r<class RID>": {
+            "nodetype": 3,
+            "reltype": 4,
+            "parentsAllowed": 3,
+            "nid": <class NID>,
+            "nodesubtype": 2,
+            "teacherNid": <teacher NID>,
+            "fraction": "3/8",
+            "rid": <class RID>,
+            "class": {
+                "data": {
+                    "ShowAverage": "0"
+                },
+                "details": {
+                    "info": {
+                        "code": "<school course code>",
+                        "teachernid": <teacher NID>,
+                        "param": "<teacher Name>"
+                    },
+                    "course": "<human readable course name>",
+                    "new": {
+                        "messages": 0,
+                        "results": 0
+                    }
+                },
+                "ShowAverage": "0"
+            },
+            "studentLock": 2
+        },
+    """
+    def getRawCurrentClassData(self):
+        return self.getBaseStudentData()['slices'][0]['data']['col1']['classes']['classesContainer']['classes']
+
+    """
+        Returns a parsed list of only the classes you're currently enrolled in.
+        The dict returned appears like so:
+            "<class NID>": {
+                "human_name": "<human readable class name>",
+                "rid": <class RID>,
+                "course_code": <course code>,
+                "teacher": {
+                    "name": "<teacher name>",
+                    "nid": '<teacher NID>'
+            }
+    """
+    def getCurrentClasses(self):
+        rawCurrentClasses = self.getRawCurrentClassData()
+        currentClasses = dict()
+        for className in rawCurrentClasses:
+            NID = rawCurrentClasses[className]['nid']
+            humanName = rawCurrentClasses[className]['class']['details']['course']
+            RID = rawCurrentClasses[className]['rid']
+            courseCode = rawCurrentClasses[className]['class']['details']['info']['teachernid']
+
+            currentClasses[NID] = dict()
+            currentClasses[NID]['human_name'] = humanName
+            currentClasses[NID]['rid'] = RID
+            currentClasses[NID]['course_code'] = courseCode
+
+            teacherName = rawCurrentClasses[className]['class']['details']['info']['param']
+            teacherNID = rawCurrentClasses[className]['class']['details']['info']['teachernid']
+
+            currentClasses[NID]['teacher'] = dict()
+            currentClasses[NID]['teacher']['name'] = teacherName
+            currentClasses[NID]['teacher']['nid'] = teacherNID
+
+        return currentClasses
+
+    """
+        Returns a list of NIDs for the classes you are currently enrolled in.
+    """
+    def getCurrentClassNIDList(self):
+        classNIDs = list()
+        for NID in self.getCurrentClasses():
+            classNIDs.append(NID)
+        return classNIDs
+
+    """
+        Returns raw class data for the current and historical set of classes you're enrolled in, which looks like:
             "r<course RID>": {
                 "nodetype": 3,
                 "Title": "<human readable name>",
@@ -211,24 +292,75 @@ class Edsby(object):
         return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=ClassPicker&match=multi',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['class']
 
     """
-        Returns a parsed list of all available classes, like so:
-        "Class NID": {
-            "human_name": "Class Name",
-            "rid": Class RID,
-        },
+        Returns a parsed list of all available classes, both current and previous.
+        The dict returned appears like so:
+            "<class NID>": {
+                "human_name": "<human readable class name>",
+                "rid": <class RID>,
+                "course_code": <course code>,
+                "teacher": {
+                    "name": "<teacher name>",
+                    "nid": '<will always be None when using this method (see below)>'
+            }
     """
-    def getClassIDList(self):
+    def getAllClasses(self):
         rawClassData = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=ClassPicker&match=multi',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['class']
-        classDict = {}
+        classDict = dict()
         for className in rawClassData:
-            humanName = rawClassData[className]['course']['class']['text']['line1']
             NID = rawClassData[className]['nid']
+            humanName = rawClassData[className]['course']['class']['text']['line1']
             RID = rawClassData[className]['rid']
+            courseCode = rawClassData[className]['course']['class']['text']['line2']['code']
+
             classDict[NID] = dict()
             classDict[NID]['human_name'] = humanName
             classDict[NID]['rid'] = RID
+            classDict[NID]['course_code'] = courseCode
+
+            classDict[NID]['teacher'] = dict()
+            classDict[NID]['teacher']['name'] = rawClassData[className]['course']['class']['text']['line2']['name']
+            # This endpoint does not return NID information for teachers, so we'll set this to None (e.g. null). If you need to
+            # Retrieve this data, try using the lookUpMessageRecipient method, or alternatively call getCurrentClasses.
+            classDict[NID]['teacher']['nid'] = None
 
         return classDict
+
+    """
+        getClassIDList has been renamed to getAllClasses. This shim provides backwards compatibility
+        for an otherwise breaking change.
+    """
+    def getClassIDList(self):
+        return getAllClasses()
+
+    """
+        Returns a list of NIDs for all available classes, both current and previous.
+    """
+    def getAllClassNIDList(self):
+        classNIDs = list()
+        for NID in self.getAllClasses():
+            classNIDs.append(NID)
+        return classNIDs
+
+    """
+        Retrieves the list of all classes you've historically been enrolled in, and
+        removes all the classes that you're currently enrolled in.
+    """
+    def getPastClasses(self):
+        currentClasses = self.getCurrentClassNIDList()
+        allClasses = self.getAllClasses()
+        for classNID in allClasses:
+            if classNID in currentClasses:
+                del allClasses[classNID]
+        return allClasses
+
+    """
+        Returns a list of NIDs for the classes you were previously enrolled in.
+    """
+    def getPastClassNIDList(self):
+        classNIDs = list()
+        for NID in self.getPastClasses():
+            classNIDs.append(NID)
+        return classNIDs
 
     """
         Returns your current average for the given class NID (e.g. 97.4)
@@ -241,16 +373,21 @@ class Edsby(object):
             return ''
 
     """
-        Retrieves all available classes, then retrieves all available averages for those classes.
-        Returns a dict of classes that looks like:
-        "<Class NID>": {
-            "human_name": "<Class Name>",
-            "rid": <Class RID>,
-            "average": <Current Average>
-        },
+        Retrieves all available averages for the classes you're currently enrolled in.
+        Adds a new property, 'average', to the class dicts returned by the getCurrentClasses() method.
+    """
+    def getCurrentClassAverages(self):
+        classes = self.getCurrentClasses()
+        for key in classes:
+            classes[key]['average'] = self.getClassAverage(key)
+        return classes
+
+    """
+        Retrieves all available averages for the classes you're currently enrolled in.
+        Adds a new property, 'average', to the class dicts returned by the getAllClasses() method.
     """
     def getAllClassAverages(self):
-        classes = self.getClassIDList()
+        classes = self.getAllClasses()
         for key in classes:
             classes[key]['average'] = self.getClassAverage(key)
         return classes
@@ -315,8 +452,6 @@ class Edsby(object):
         }
     """
     def getClassAssignmentList(self, classNID, classRID):
-        self.getClassIDList() # Ensure the Edsby API is ready to return class data. This call is required before the next calls are made
-        self.getClassFeed(classNID)
         scores = self.getClassAssignmentScores(classNID, classRID) # Fetch assignment scores
         metadata = self.getClassAssignmentMetadata(classNID) # Fetch assignment metadata
         assignmentData = {
@@ -396,17 +531,33 @@ class Edsby(object):
             return ''
 
     """
-        This function calls getClassIDList and adds all available roster information
+        This function calls getCurrentClasses and adds all available roster information
         from each class to it.
+
+        This is useful if you want roster information for only the current classes you're enrolled in.
+    """
+    def getCurrentClassRosters(self):
+        rosterData = self.getCurrentClasses()
+        for NID in rosterData:
+            rosterData[NID]['classmates'] = self.getClassmates(NID)
+
+        return rosterData
+
+    """
+        This function calls getAllClasses and adds all available roster information
+        from each class to it.
+
+        This is useful if you want historical roster information for ALL classes you've been enrolled in this year.
     """
     def getAllClassRosters(self):
-        for NID in self.getClassIDList():
+        rosterData = self.getAllClasses()
+        for NID in rosterData:
             classData[NID]['classmates'] = self.getClassmates(NID)
 
-        return classData
+        return rosterData
 
     """
-        Retrieves the feed of all assignments and messages posted in the class
+        Retrieves the feed of all assignments and messages posted in the feed of a given class NID.
     """
     def getClassFeed(self, classNID):
         feed = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=CourseFeed',cookies=self.getCookies(),headers=self.getHeaders()).json()
