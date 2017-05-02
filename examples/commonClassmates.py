@@ -7,8 +7,10 @@
 import requests, json
 from edsby import Edsby
 
-# Given the value of getAllClassRosters, this function returns a dict of students filtered by
-# commonality- that is, the students returned have multiple classes with you.
+print 'Logging in...'
+edsby = Edsby(host='your_instance.edsby.com', username='your_username', password='password')
+print 'Logged in.' if isinstance(edsby, object) else 'Login failed!'
+
 def filterCommonClassmates(classData):
     # These loops prepare each class for search by creating an array of student NIDs for each class
     # We can then find common students by searching for their NIDs in this array
@@ -45,25 +47,25 @@ def filterCommonClassmates(classData):
               commonClassmates[studentNID]['human_names'].append(classData[classEntry]['human_name']) # Add to common classmates dict
 
             if classData[classEntry]['classmates'][student]['FirstName'] not in commonClassmates[studentNID]['name']: # If we haven't added the student's name data yet
-              # Tuple of available name data. Sometimes MName is not present, so there's a ternary expression for the middle name
+              # Tuple of available name data. Sometimes MName is not present so there's a ternary expression for the middle name
               studentName = (classData[classEntry]['classmates'][student]['FirstName'], (classData[classEntry]['classmates'][student]['MName'] if 'MName' in classData[classEntry]['classmates'][student] else ''), classData[classEntry]['classmates'][student]['LastName'])
               commonClassmates[studentNID]['name'].extend(studentName) # Add to common classmates dict
 
+    print 'Done.'
     return commonClassmates
 
-# Given the commonClassmates dict, this function prints a quick, formatted summary.
 def printStudentList(commonClassmates):
+    print '\nPeople you currently have multiple classes with: '
+
     for student in commonClassmates:
-      if len(commonClassmates[student]['class_nids']) > 1 and notPrinted:
-        print ' '.join(commonClassmates[student]['name']) +': '+ ','.join(commonClassmates[student]['human_names'])
+      if len(commonClassmates[student]['class_nids']) > 1:
+        print '\t' + ' '.join(commonClassmates[student]['name']) +': '+ ','.join(commonClassmates[student]['human_names'])
 
-edsby = Edsby(host='your_host.edsby.com', username='your_username', password='your_password')
+    print '\n'
 
-# Retrieve the full rosters of students, in each one of your classes
-classData = edsby.getAllClassRosters()
-
-# Filter the list of all classmates by only students who are members of multiple classes that you, the user, have.
+# Retrieve the list of classes in which the user is currently enrolled
+print 'Getting class data...'
+classData = edsby.getCurrentClassRosters()
+print 'Filtering...'
 filtered = filterCommonClassmates(classData)
-
-# Print a summary of the filtered classmate data
 printStudentList(filtered)

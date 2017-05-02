@@ -1,8 +1,7 @@
 from edsby import Edsby
 import requests, json, random
 
-edsby = Edsby(host='your_edsbyhost.edsby.com')
-edsby.login(username='your_username', password='your_password')
+edsby = Edsby(host='your_edsbyhost.edsby.com', username='your_username', password='your_password')
 
 print "Your grades:"
 courses = edsby.getAllClassAverages()
