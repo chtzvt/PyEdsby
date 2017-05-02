@@ -28,7 +28,7 @@ Secondly, I can only guarantee that this works with my school's own Edsby instan
 PyEdsby implements more or less every major feature of the web interface, and then some. You can access all the important data visible on the web that you, as a student, would be interested in. Check out [the documentation](https://github.com/ctrezevant/PyEdsby/wiki/Methods) for a list of available methods.
 
 Using PyEdsby, you could:
-  - Create a tool to find common classmates in each of your periods,
+  - [Create a tool to find common classmates in each of your periods](https://github.com/ctrezevant/PyEdsby/blob/master/examples/commonClassmates.py),
   - Automatically crawl class feeds, and download attachments any time a teacher posts a new one,
   - Write a script that notifies you whenever your grades drop below a certain point,
   - Automatically post a message or link in the feed for a specific class,
