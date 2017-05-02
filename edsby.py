@@ -1,7 +1,7 @@
 import requests, json
 
 """
-    Edsby.py: An API wrapper/library for Python - v0.2
+    Edsby.py: An API wrapper/library for Python - v0.3
     https://github.com/ctrezevant/PyEdsby/
 
     (c) 2017 Charlton Trezevant - www.ctis.me
@@ -359,6 +359,16 @@ class Edsby(object):
                 return classMates['slices'][0]['data']['places']['item']
         else:
             return ''
+
+    """
+        Given the dict of class IDs returned by getClassIDList, this function adds all available roster information
+        from each class to it.
+    """
+    def getAllClassRosters(self, classData):
+        for NID in self.getClassIDList():
+            classData[NID]['classmates'] = self.getClassmates(NID)
+
+        return classData
 
     """
         Retrieves the feed of all assignments and messages posted in the class
