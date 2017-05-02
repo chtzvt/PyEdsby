@@ -361,7 +361,7 @@ class Edsby(object):
             return ''
 
     """
-        Given the dict of class IDs returned by getClassIDList, this function adds all available roster information
+        This function calls getClassIDList and adds all available roster information
         from each class to it.
     """
     def getAllClassRosters(self):
