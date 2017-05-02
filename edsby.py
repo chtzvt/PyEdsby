@@ -364,7 +364,7 @@ class Edsby(object):
         Given the dict of class IDs returned by getClassIDList, this function adds all available roster information
         from each class to it.
     """
-    def getAllClassRosters(self, classData):
+    def getAllClassRosters(self):
         for NID in self.getClassIDList():
             classData[NID]['classmates'] = self.getClassmates(NID)
 
