@@ -1,7 +1,7 @@
 import requests, json
 
 """
-    Edsby.py: An API wrapper/library for Python - v0.3
+    Edsby.py: An API wrapper/library for Python - v0.4
     https://github.com/ctrezevant/PyEdsby/
 
     (c) 2017 Charlton Trezevant - www.ctis.me
@@ -52,6 +52,15 @@ class Edsby(object):
         return True
 
     """
+        Overwrites the session and clears all authentication keys/student metadata,
+        which deauthenticates your session (effectively logging you out).
+    """
+    def logout(self):
+        self.endSession()
+        self.clearStudentData()
+        return True
+
+    """
         Allows headers to be changed after instantiation (for imitating a mobile device, for example)
     """
     def setHeaders(self, headers):
@@ -83,6 +92,14 @@ class Edsby(object):
         return self.studentData
 
     """
+        This method overwrites all internally held student data.
+    """
+    def clearStudentData(self):
+        self.authData = None
+        self.studentData = None
+        return True
+
+    """
         Can be used to modify the internally held student metadata
     """
     def setStudentData(self, studentData):
@@ -93,14 +110,20 @@ class Edsby(object):
         login, as it will overwrite the cookies.
     """
     def getSession(self):
-        return requests.Session().get('https://'+self.edsbyHost+"/core/login/3472?xds=loginform&editable=true",headers=self.globalHeaders)
+        return requests.Session().get('https://'+self.edsbyHost+"/core/login/3472?xds=loginform&editable=true",headers=self.getHeaders())
+
+    """
+        This method overwrites the current session, which effectively logs the user out.
+    """
+    def endSession(self):
+        self.session = self.getSession()
 
     """
         Retrieves a variety of authentication data from Edsby (server nonces, keys, etc)
         Which are then used by sendAuthenticationData to complete user authentication.
     """
     def getauthData(self, loginData):
-        self.authData = requests.get('https://'+self.edsbyHost+"/core/node.json/3472?xds=fetchcryptdata&type=Plaintext-LeapLDAP",cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()["slices"][0]
+        self.authData = requests.get('https://'+self.edsbyHost+"/core/node.json/3472?xds=fetchcryptdata&type=Plaintext-LeapLDAP",cookies=self.getCookies(),headers=self.getHeaders()).json()["slices"][0]
         return {
             '_formkey': self.authData["_formkey"],
             'sauthdata': self.authData['data']["sauthdata"],
@@ -116,7 +139,7 @@ class Edsby(object):
         student metadata returned by Edsby
     """
     def sendAuthenticationData(self):
-        studentData = requests.post('https://'+self.edsbyHost+'/core/login/3472?xds=loginform&editable=true',data=self.authData,cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()
+        studentData = requests.post('https://'+self.edsbyHost+'/core/login/3472?xds=loginform&editable=true',data=self.authData,cookies=self.getCookies(),headers=self.getHeaders()).json()
         return {
           'unid': studentData['unid'],
           'compiled': studentData['compiled'],
@@ -132,15 +155,29 @@ class Edsby(object):
         though I haven't explored it in detail.
     """
     def getBootstrapData(self):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/?xds=bootstrap',cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/?xds=bootstrap',cookies=self.getCookies(),headers=self.getHeaders()).json()
 
     """
         This is another required API call, which returns a wealth of metadata about the student as a whole,
         including classes. This is yet another thing I haven't explored in great detail.
     """
     def getBaseStudentData(self):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=BaseStudent',cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=BaseStudent',cookies=self.getCookies(),headers=self.getHeaders()).json()
 
+    """
+        Returns personal information about the student, including their full name,
+        phone number, address, and registered parents.
+    """
+    def getStudentPersonalInfo(self):
+        personalInfo = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=editPersonalInformation',cookies=self.getCookies(),headers=self.getHeaders()).json()["slices"][0]
+        return personalInfo['data'] if 'data' in personalInfo else ''
+
+    """
+        Returns the currently active account settings for the user.
+    """
+    def getAccountSettings(self):
+        userSettings = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=editSettings',cookies=self.getCookies(),headers=self.getHeaders()).json()["slices"][0]
+        return userSettings['data'] if 'data' in userSettings else ''
 
     """
         Returns raw class data, which looks like:
@@ -171,7 +208,7 @@ class Edsby(object):
             }
     """
     def getRawClassData(self):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=ClassPicker&match=multi',cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()['slices'][0]['data']['class']
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=ClassPicker&match=multi',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['class']
 
     """
         Returns a parsed list of all available classes, like so:
@@ -181,7 +218,7 @@ class Edsby(object):
         },
     """
     def getClassIDList(self):
-        rawClassData = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=ClassPicker&match=multi',cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()['slices'][0]['data']['class']
+        rawClassData = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=ClassPicker&match=multi',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['class']
         classDict = {}
         for className in rawClassData:
             humanName = rawClassData[className]['course']['class']['text']['line1']
@@ -197,7 +234,7 @@ class Edsby(object):
         Returns your current average for the given class NID (e.g. 97.4)
     """
     def getClassAverage(self, classNID):
-        classData = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=MyWork&student='+str(self.studentData['unid']),cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()['slices'][0]['data']
+        classData = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=MyWork&student='+str(self.studentData['unid']),cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
         if 'loaddata' in classData and 'average' in classData['loaddata']:
             return classData['loaddata']['average']
         else:
@@ -223,14 +260,14 @@ class Edsby(object):
         This includes the NID, RID, and weighting (points possible) of the assignments, but not your score.
     """
     def getClassAssignmentMetadata(self, classNID):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=MyWork&student='+str(self.studentData['unid']),cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()['slices'][0]['data']['loaddata']['gradebook']['terms']
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=MyWork&student='+str(self.studentData['unid']),cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['loaddata']['gradebook']['terms']
 
     """
         Returns an object containing all assignment scores for a specified course, ordered by NID
         This includes the NID and points earned on the assignment, but nothing else.
     """
     def getClassAssignmentScores(self, classNID, classRID):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'/'+str(classRID)+'/'+str(classNID)+'?xds=MyWorkAssessmentPane&unit=all&student='+str(self.studentData['unid'])+'&model=24605449',cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()["slices"][0]["data"]['grades']
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'/'+str(classRID)+'/'+str(classNID)+'?xds=MyWorkAssessmentPane&unit=all&student='+str(self.studentData['unid'])+'&model=24605449',cookies=self.getCookies(),headers=self.getHeaders()).json()["slices"][0]["data"]['grades']
 
     """
         Returns an object containing all assignment scores for a specified course, ordered by NID
@@ -240,14 +277,14 @@ class Edsby(object):
         before reading. getClassAssignmentList can handle and process data returned from both of these endpoints
     """
     def getMixedFormatClassAssignmentScores(self, classNID, classRID):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'/'+str(classRID)+'/'+str(classNID)+'?xds=MyWorkChart&student='+str(self.studentData['unid']),cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()['slices'][0]['data']['loaddata']['grades']
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'/'+str(classRID)+'/'+str(classNID)+'?xds=MyWorkChart&student='+str(self.studentData['unid']),cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['loaddata']['grades']
 
     """
         Returns an array of NIDs for assignments that have been published (e.g. are visible) for a
         given course
     """
     def getClassPublishedAssignments(self, classNID, classRID):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'/'+str(classRID)+'/'+str(classNID)+'?xds=MyWorkChart&student='+str(self.studentData['unid']),cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()['slices'][0]['data']['bubbles']['publishedAssessments'].split(',')
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'/'+str(classRID)+'/'+str(classNID)+'?xds=MyWorkChart&student='+str(self.studentData['unid']),cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['bubbles']['publishedAssessments'].split(',')
 
     """
         Gathers all available, published assignment data from a specified class, and computes scores for each. Returns an object
@@ -325,8 +362,6 @@ class Edsby(object):
 
         return assignmentData
 
-
-
     """
         Returns a dict with a basic summary of assignments and their grades for a
         given course (e.g "human name": "percentage")
@@ -346,14 +381,14 @@ class Edsby(object):
         parse these yet.
     """
     def getRawClassAttendenceRecords(self, classID):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classID)+'?xds=MyWorkChart&student='+str(self.studentData['unid']),cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()['data']['chartContainer']['chart']['attendanceRecords']['data']['right']['records']['incident']
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classID)+'?xds=MyWorkChart&student='+str(self.studentData['unid']),cookies=self.getCookies(),headers=self.getHeaders()).json()['data']['chartContainer']['chart']['attendanceRecords']['data']['right']['records']['incident']
 
     """
         Returns a list of all member students of a class
         Say hi to your classmates!
     """
     def getClassmates(self, classNID):
-        classMates = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=ClassStudentList',cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()
+        classMates = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=ClassStudentList',cookies=self.getCookies(),headers=self.getHeaders()).json()
         if 'slices' in classMates: # Make sure we got a valid response from the API.
             if 'places' in classMates['slices'][0]['data'] and 'item' in classMates['slices'][0]['data']['places']:
                 return classMates['slices'][0]['data']['places']['item']
@@ -374,32 +409,32 @@ class Edsby(object):
         Retrieves the feed of all assignments and messages posted in the class
     """
     def getClassFeed(self, classNID):
-        feed = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=CourseFeed',cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()
+        feed = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=CourseFeed',cookies=self.getCookies(),headers=self.getHeaders()).json()
         return feed if 'item' in feed['slices'][0]['data'] else ''
 
     """
         Course calendar- returns calendar entries for the specified course
     """
     def getClassCalendar(self, classNID):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=CalendarPanel_Class',cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()['slices'][0]['data']
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=CalendarPanel_Class',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
 
     """
         Course assignment outline, shows upcoming and historical assignments for the course
     """
     def getClassPlan(self, classNID):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=Course&_context=1',cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()['slices'][0]['data']['col1']['outline']['plan']['tree']
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=Course&_context=1',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['col1']['outline']['plan']['tree']
 
     """
         Retrieves all current/pending notifications for the student
     """
     def getStudentNotifications(self):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=notifications',cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()['slices'][0]['data']
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=notifications',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
 
     """
         Returns all available calendar data (due/overdue assignments, events, schedules)
     """
     def getCalendarData(self):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=Calendar',cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()["slices"][0]["data"]["caldata"]
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=Calendar',cookies=self.getCookies(),headers=self.getHeaders()).json()["slices"][0]["data"]["caldata"]
 
     """
         Get calendar entries for all upcoming due assignments
@@ -432,7 +467,7 @@ class Edsby(object):
         Returns ALL direct Edsby messages from your inbox
     """
     def getDirectMessages(self):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=Messages&_context=1',cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()["slices"][0]["data"]["body"]["left"]["items"]["item"]
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=Messages&_context=1',cookies=self.getCookies(),headers=self.getHeaders()).json()["slices"][0]["data"]["body"]["left"]["items"]["item"]
 
     """
         Sends a direct message to a specified user
@@ -454,14 +489,14 @@ class Edsby(object):
             'media-fill-include-integrations-integrationfiledata': message['filedata'],
             'media-fill-include-integrations-integrationfiles': message['files']
         }
-        return requests.post('https://'+self.edsbyHost+'/core/create/38089?xds=MessagesCompose&permaLinkKey=false&_processed=true',data=payload,cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()
+        return requests.post('https://'+self.edsbyHost+'/core/create/38089?xds=MessagesCompose&permaLinkKey=false&_processed=true',data=payload,cookies=self.getCookies(),headers=self.getHeaders()).json()
 
     """
         Allows you to search for any higher level user (teacher, administrator)
         whose name matches or contains a particular string
     """
     def lookUpMessageRecipient(self, query):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=msgUserPicker&pattern='+query+'&noForm=true',cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()["slices"][0]["data"]["item"]
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=msgUserPicker&pattern='+query+'&noForm=true',cookies=self.getCookies(),headers=self.getHeaders()).json()["slices"][0]["data"]["item"]
 
     """
         Posts a message in the class feed. This takes a dict called message, which looks like this:
@@ -486,7 +521,7 @@ class Edsby(object):
             'social-shmart-file-integrations-integrationfiledata': message['filedata'],
             'social-shmart-file-integrations-integrationfiles': message['files']
         }
-        return requests.post('https://'+self.edsbyHost+'/core/create/'+str(classNID)+'?xds=CourseFeedMsg&xdsr=CourseFeed&rxdstype=ref&merge=merge',data=messageSubmission,cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()['slice']['slices'][0]['data']['item']
+        return requests.post('https://'+self.edsbyHost+'/core/create/'+str(classNID)+'?xds=CourseFeedMsg&xdsr=CourseFeed&rxdstype=ref&merge=merge',data=messageSubmission,cookies=self.getCookies(),headers=self.getHeaders()).json()['slice']['slices'][0]['data']['item']
 
     """
         Posts a reply to a message in the class feed. This takes a dict called message, which looks like this:
@@ -515,7 +550,7 @@ class Edsby(object):
             'replyTo': '',
             'thread': message['parent_nid']
         }
-        return requests.post('https://'+self.edsbyHost+'/core/create/'+str(classNID)+'/'+str(message['parent_rid'])+'/'+str(classNID)+'?xds=feedreply&xdsr=CourseFeed&__delegated=CourseFeed',data=messageSubmission,cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()['slice']['slices'][0]['data']['item']
+        return requests.post('https://'+self.edsbyHost+'/core/create/'+str(classNID)+'/'+str(message['parent_rid'])+'/'+str(classNID)+'?xds=feedreply&xdsr=CourseFeed&__delegated=CourseFeed',data=messageSubmission,cookies=self.getCookies(),headers=self.getHeaders()).json()['slice']['slices'][0]['data']['item']
 
     """
         Posts a message with an accompanying file in the class feed. This takes a dict called message,
@@ -542,7 +577,7 @@ class Edsby(object):
             'social-shmart-file-integrations-integrationfiledata': message['filedata'],
             'social-shmart-file-integrations-integrationfiles': message['files']
         }
-        postMetadata = requests.post('https://'+self.edsbyHost+'/core/create/'+str(classNID)+'?xds=CourseFeedMsg&xdsr=CourseFeed&rxdstype=ref&merge=merge',data=messageSubmission,cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()['slice']['slices'][0]['data']['item']
+        postMetadata = requests.post('https://'+self.edsbyHost+'/core/create/'+str(classNID)+'?xds=CourseFeedMsg&xdsr=CourseFeed&rxdstype=ref&merge=merge',data=messageSubmission,cookies=self.getCookies(),headers=self.getHeaders()).json()['slice']['slices'][0]['data']['item']
         parentRID = next(iter(postMetadata))
         cookies = self.session.cookies.get_dict()
 
@@ -558,7 +593,7 @@ class Edsby(object):
 
         uploadData['files'] = (fileName, open(filePath, 'rb'))
 
-        return requests.post('https://'+self.edsbyHost+'/core/create/'+str(classNID)+'/'+str(postMetadata[parentRID]['rid'])+'/'+str(postMetadata[parentRID]['nid'])+'?xds=MultiFileUploader',files=uploadData,cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()
+        return requests.post('https://'+self.edsbyHost+'/core/create/'+str(classNID)+'/'+str(postMetadata[parentRID]['rid'])+'/'+str(postMetadata[parentRID]['nid'])+'?xds=MultiFileUploader',files=uploadData,cookies=self.getCookies(),headers=self.getHeaders()).json()
 
     """
         Likes an item in the feed for a class
@@ -568,14 +603,14 @@ class Edsby(object):
             'likes': 1,
             '_formkey': self.studentData['formkey']
         }
-        return requests.post('https://'+self.edsbyHost+'/core/node/'+str(classNID)+'/'+str(feedItemRID)+'/'+str(feedItemNID)+'?xds=doLike',data=likeData,cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()
+        return requests.post('https://'+self.edsbyHost+'/core/node/'+str(classNID)+'/'+str(feedItemRID)+'/'+str(feedItemNID)+'?xds=doLike',data=likeData,cookies=self.getCookies(),headers=self.getHeaders()).json()
 
     """
         Retrieves metadata about files attached to feed items, should they be present
         If Edsby complains, call getClassFeed before using this function
     """
     def getAttachmentMetadata(self, feedItemNID, attachmentNID):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(feedItemNID)+'/'+str(attachmentNID)+'?xds=AlbumFileView',cookies=self.session.cookies.get_dict(),headers=self.globalHeaders).json()['slices'][0]['data']['item']
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(feedItemNID)+'/'+str(attachmentNID)+'?xds=AlbumFileView',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['item']
 
     """
         Generates the URL to download a particular file from Edsby, as such URLs are long and verbose.
@@ -593,7 +628,7 @@ class Edsby(object):
     def downloadAttachment(self, classNID, feedItemNID, feedItemRID, attachmentNID, filePath):
         self.getClassFeed(classNID)  # Must call these before attempting to download, otherwise API denies access
         self.getAttachmentMetadata(feedItemNID, feedItemRID) # Another prerequisite call
-        attachment = requests.get(self.getAttachmentDownloadURL(classNID, feedItemNID, feedItemRID, attachmentNID),cookies=self.session.cookies.get_dict(),headers=self.globalHeaders,stream=True)
+        attachment = requests.get(self.getAttachmentDownloadURL(classNID, feedItemNID, feedItemRID, attachmentNID),cookies=self.getCookies(),headers=self.getHeaders(),stream=True)
         with open(filePath, 'wb') as localFile:
             for attachmentPart in attachment.iter_content(chunk_size=1024):
                 if attachmentPart:
