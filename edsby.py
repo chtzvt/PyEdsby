@@ -1,7 +1,7 @@
 import requests, json
 
 """
-    Edsby.py: An API wrapper/library for Python - v0.5
+    Edsby.py: An API wrapper/library for Python - v0.6
     https://github.com/ctrezevant/PyEdsby/
 
     (c) 2017 Charlton Trezevant - www.ctis.me
@@ -648,6 +648,56 @@ class Edsby(object):
     """
     def lookUpMessageRecipient(self, query):
         return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=msgUserPicker&pattern='+query+'&noForm=true',cookies=self.getCookies(),headers=self.getHeaders()).json()["slices"][0]["data"]["item"]
+
+    """
+        Edsby has a built-in website metadata scraper, which it uses to retrieve
+        various information about links before they're sent off.
+        {
+            "type": "link",
+            "code": 200,
+            "embedstatus": "complete",
+            "href": "<website URL>",
+            "thumbnail": "<website thumbnail>",
+            "title": "<website title>",
+            "description": "<meta description of website>"
+        }
+    """
+    def scrapeURLMetadata(self, classNID, url):
+        return requests.get('https://'+self.edsbyHost+'/load/embed.json/'+str(classNID)+'?xds=bookMarkPreview&scrape='+requests.utils.quote(url),cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
+
+    """
+        Formats the website metadata from the site scraper, preparing it to be included in a message dict.
+        This dict should become the value of the url property for your message dict (which maps to the
+        social-shmart-url prop in the Edsby API call)
+    """
+    def formatURLMetadata(self, metadata):
+        return {
+                "url": metadata['href'],
+                "type": metadata['type'],
+                "code": metadata['code'],
+                "embedstatus": metadata['embedstatus'],
+                "href": metadata['href'],
+                "thumbnail": metadata['thumbnail'] if 'thumbnail' in metadata else '',
+                "title": metadata['title'] if 'title' in metadata else '',
+                "description": metadata['description'] if 'description' in metadata else '',
+                "uuid": 6,
+                "left": {
+                    "thumbnail": metadata['thumbnail'] if 'thumbnail' in metadata else ''
+                },
+                "right": {
+                    "title": metadata['title'] if 'title' in metadata else '',
+                    "description": metadata['description'] if 'description' in metadata else ''
+                }
+        }
+
+    """
+        Edsby expects the URL metadata passed in the message dict to be a string, so this method
+        retrieves the correct metadata, converts the dict to the proper format, and then returns
+        the formatted dict as a string.
+    """
+    def getFormattedURLMetadataString(self, classNID, url):
+        metadata = self.scrapeURLMetadata(classNID, url)
+        return json.dumps(self.formatURLMetadata(metadata))
 
     """
         Posts a message in the class feed. This takes a dict called message, which looks like this:
