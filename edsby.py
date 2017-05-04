@@ -1,7 +1,7 @@
 import requests, json
 
 """
-    Edsby.py: An API wrapper/library for Python - v0.6
+    Edsby.py: An API wrapper/library for Python - v0.7
     https://github.com/ctrezevant/PyEdsby/
 
     (c) 2017 Charlton Trezevant - www.ctis.me
@@ -31,23 +31,30 @@ class Edsby(object):
                 'x-requested-with':'XMLHttpRequest'
             }
 
+        # You can pass a Session instance you've already made to PyEdsby, if you don't want it to create its own.
+        # Note that we only use sessions to keep track of cookies, so if you also want to use custom headers make sure
+        # that you pass those in.
+        if 'session' in kwargs:
+            self.session = kwargs['session']
+        else:
+            self.session = self.getSession()
+
+        # You can also pass instance metadata, if you want to create PyEdsby instances a little faster.
+        # All the class really needs is a dict with the nid property set, so you can pass something like
+        # {'nid': 'your nid'} and not break anything.
+        if 'meta' in kwargs:
+            self.instanceMeta = kwargs['meta']
+        else
+            self.instanceMeta = self.parseInstanceMetadata()
+
+        # You can also pass the constructor your credentials, if you'd rather not call the login method.
         if 'username' in kwargs and 'password' in kwargs:
             self.login(username=kwargs['username'], password=kwargs['password'])
 
-        if 'cookies' in kwargs:
-            self.setCookies(kwargs['cookies'])
-
-        if 'headers' in kwargs:
-            self.setHeaders(kwargs['headers'])
-
-        if 'studentData' in kwargs:
-            self.setStudentData(kwargs['studentData'])
-
     """
-        Authenticates the session and retrieves student metadata
+        Authenticates the session and retrieves instance and student metadata
     """
     def login(self, **kwargs):
-        self.session = self.getSession()
         self.authData = self.getauthData((kwargs['username'], kwargs['password']))
         self.studentData = self.sendAuthenticationData()
         return True
@@ -76,8 +83,13 @@ class Edsby(object):
     """
         Allows cookies to be manually set or modified (initially set automatically by
         the getSession method)
+
+        You can either pass a dict or a cookiejar. If you pass a dict, then the method will automatically
+        convert it into the cookiejar format.
     """
     def setCookies(self, cookies):
+        if isinstance(cookies, dict):
+            cookies = requests.utils.cookiejar_from_dict(cookies)
         self.session.cookies = cookies
 
     """
@@ -111,7 +123,7 @@ class Edsby(object):
         login, as it will overwrite the cookies.
     """
     def getSession(self):
-        return requests.Session().get('https://'+self.edsbyHost+"/core/login/3472?xds=loginform&editable=true",headers=self.getHeaders())
+        return requests.Session().get('https://'+self.edsbyHost+"/core/login/"+str(self.instanceMeta['nid'])+"?xds=loginform&editable=true",headers=self.getHeaders())
 
     """
         This method overwrites the current session, which effectively logs the user out.
@@ -120,11 +132,47 @@ class Edsby(object):
         self.session = self.getSession()
 
     """
+        Scrapes the InstanceMeta dict from your Edsby instance.
+    """
+    def parseInstanceMetadata(self):
+        rawPage = requests.get('https://'+self.edsbyHost,headers=self.getHeaders()).text
+        meta = rawPage[rawPage.find('openSesame(')+12:] # Cut out all parts of webpage before openSesame call.
+        meta = meta[:meta.find('}')].split(',') # cut out everything after the openSesame call that isn't a part of the metadata we want
+
+        # Metadata's now a string, but we aren't ready to return it just yet. We need to convert it from an array of
+        # conjoined key:value pairs (e.g. "base:'BasePublic'") into a format we can use.
+        metaTuples = list()
+        for prop in meta: # for every entry in our array of conjoined k:vs:
+            key = prop[0:prop.find(":")].strip() # Cut only the property out ([base]:'BasePublic')
+            value = prop[len(key)+1:-1].replace("'", "") # Cut out the value (base:['BasePublic']), remove leftover 's
+            metaTuples.append((key, value)) # Build our array of (key, value) tuples
+
+        # Convert the tuple array into a dict, and return it.
+        # For more on the theory behind this, have a look at https://docs.python.org/2/tutorial/datastructures.html#tut-listcomps
+        return dict(metaTuples)
+
+    """
+        Returns a dict of useful metadata about your Edsby instance.
+        This is required, as we'll need the instance NID to authenticate the user.
+        {
+            nid: instance NID,
+            uid: instance NID,
+            version: 17431,
+            base: 'BasePublic',
+            compiled: 1492092324,
+            app: 'us2',
+            system: 'us2'
+        }
+    """
+    def getInstanceMetadata(self):
+        return self.instanceMeta
+
+    """
         Retrieves a variety of authentication data from Edsby (server nonces, keys, etc)
         Which are then used by sendAuthenticationData to complete user authentication.
     """
     def getauthData(self, loginData):
-        self.authData = requests.get('https://'+self.edsbyHost+"/core/node.json/3472?xds=fetchcryptdata&type=Plaintext-LeapLDAP",cookies=self.getCookies(),headers=self.getHeaders()).json()["slices"][0]
+        self.authData = requests.get('https://'+self.edsbyHost+"/core/node.json/"+str(self.instanceMeta['nid'])+"?xds=fetchcryptdata&type=Plaintext-LeapLDAP",cookies=self.getCookies(),headers=self.getHeaders()).json()["slices"][0]
         return {
             '_formkey': self.authData["_formkey"],
             'sauthdata': self.authData['data']["sauthdata"],
@@ -140,7 +188,7 @@ class Edsby(object):
         student metadata returned by Edsby
     """
     def sendAuthenticationData(self):
-        studentData = requests.post('https://'+self.edsbyHost+'/core/login/3472?xds=loginform&editable=true',data=self.authData,cookies=self.getCookies(),headers=self.getHeaders()).json()
+        studentData = requests.post('https://'+self.edsbyHost+'/core/login/'+str(self.instanceMeta['nid'])+'?xds=loginform&editable=true',data=self.authData,cookies=self.getCookies(),headers=self.getHeaders()).json()
         return {
           'unid': studentData['unid'],
           'compiled': studentData['compiled'],
