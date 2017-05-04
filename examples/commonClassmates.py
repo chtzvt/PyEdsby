@@ -58,9 +58,15 @@ def filterCommonClassmates(classData):
                     'name']:  # If we haven't added the student's name data yet
                     # Tuple of available name data. Sometimes MName is not present so there's a ternary expression for the middle name
                     studentName = (classData[classEntry]['classmates'][student]['FirstName'], (
+<<<<<<< HEAD
                         classData[classEntry]['classmates'][student]['MName'] if 'MName' in
                                                                                  classData[classEntry]['classmates'][
                                                                                      student] else ''),
+=======
+                    classData[classEntry]['classmates'][student]['MName'] if 'MName' in
+                                                                             classData[classEntry]['classmates'][
+                                                                                 student] else ''),
+>>>>>>> master
                                    classData[classEntry]['classmates'][student]['LastName'])
                     commonClassmates[studentNID]['name'].extend(studentName)  # Add to common classmates dict
 
