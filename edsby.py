@@ -1,7 +1,7 @@
 import requests, json
 
 """
-    Edsby.py: An API wrapper/library for Python - v0.7
+    Edsby.py: An API wrapper/library for Python - v0.7.1
     https://github.com/ctrezevant/PyEdsby/
 
     (c) 2017 Charlton Trezevant - www.ctis.me
@@ -31,6 +31,13 @@ class Edsby(object):
                 'x-requested-with':'XMLHttpRequest'
             }
 
+        # You can also pass instance metadata, if you want to create PyEdsby instances a little faster.
+        # All the class really needs is a dict with the nid property set, so you can pass something like
+        # {'nid': 'your nid'} and not break anything.
+        if 'meta' in kwargs:
+            self.instanceMeta = kwargs['meta']
+        else:
+            self.instanceMeta = self.parseInstanceMetadata()
         # You can pass a Session instance you've already made to PyEdsby, if you don't want it to create its own.
         # Note that we only use sessions to keep track of cookies, so if you also want to use custom headers make sure
         # that you pass those in.
@@ -38,14 +45,6 @@ class Edsby(object):
             self.session = kwargs['session']
         else:
             self.session = self.getSession()
-
-        # You can also pass instance metadata, if you want to create PyEdsby instances a little faster.
-        # All the class really needs is a dict with the nid property set, so you can pass something like
-        # {'nid': 'your nid'} and not break anything.
-        if 'meta' in kwargs:
-            self.instanceMeta = kwargs['meta']
-        else
-            self.instanceMeta = self.parseInstanceMetadata()
 
         # You can also pass the constructor your credentials, if you'd rather not call the login method.
         if 'username' in kwargs and 'password' in kwargs:
