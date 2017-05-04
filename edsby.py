@@ -607,28 +607,12 @@ class Edsby(object):
                 if isinstance(assignmentData['assignments'][assg]['weighting'],
                               dict):  # If dict access weighting prop as a dict
                     assignmentData['assignments'][assignmentNID]['weighting'] = \
-<<<<<<< refs/remotes/origin/master
-<<<<<<< HEAD
                         assignmentData['assignments'][assg]['weighting']['0']
-=======
-                    assignmentData['assignments'][assg]['weighting']['0']
->>>>>>> master
-=======
-                        assignmentData['assignments'][assg]['weighting']['0']
->>>>>>> Correct formatting
 
                 elif isinstance(assignmentData['assignments'][assg]['weighting'],
                                 basestring):  # If string access weighting prop as a dict after running through a JSON parser
                     assignmentData['assignments'][assignmentNID]['weighting'] = \
-<<<<<<< refs/remotes/origin/master
-<<<<<<< HEAD
                         json.loads(assignmentData['assignments'][assg]['weighting'])['0']
-=======
-                    json.loads(assignmentData['assignments'][assg]['weighting'])['0']
->>>>>>> master
-=======
-                        json.loads(assignmentData['assignments'][assg]['weighting'])['0']
->>>>>>> Correct formatting
             else:
                 assignmentData['no_weights_found'].push(
                     assignmentNID)  # No weighting data available for this entry, file it away
@@ -727,18 +711,8 @@ class Edsby(object):
 
     def getClassCalendar(self, classNID):
         return \
-<<<<<<< refs/remotes/origin/master
-<<<<<<< HEAD
             requests.get('https://' + self.edsbyHost + '/core/node.json/' + str(classNID) + '?xds=CalendarPanel_Class',
                          cookies=self.getCookies(), headers=self.getHeaders()).json()['slices'][0]['data']
-=======
-        requests.get('https://' + self.edsbyHost + '/core/node.json/' + str(classNID) + '?xds=CalendarPanel_Class',
-                     cookies=self.getCookies(), headers=self.getHeaders()).json()['slices'][0]['data']
->>>>>>> master
-=======
-            requests.get('https://' + self.edsbyHost + '/core/node.json/' + str(classNID) + '?xds=CalendarPanel_Class',
-                         cookies=self.getCookies(), headers=self.getHeaders()).json()['slices'][0]['data']
->>>>>>> Correct formatting
 
     """
         Course assignment outline, shows upcoming and historical assignments for the course
@@ -764,20 +738,9 @@ class Edsby(object):
 
     def getCalendarData(self):
         return \
-<<<<<<< refs/remotes/origin/master
-<<<<<<< HEAD
             requests.get(
                 'https://' + self.edsbyHost + '/core/node.json/' + str(self.studentData['unid']) + '?xds=Calendar',
                 cookies=self.getCookies(), headers=self.getHeaders()).json()["slices"][0]["data"]["caldata"]
-=======
-        requests.get('https://' + self.edsbyHost + '/core/node.json/' + str(self.studentData['unid']) + '?xds=Calendar',
-                     cookies=self.getCookies(), headers=self.getHeaders()).json()["slices"][0]["data"]["caldata"]
->>>>>>> master
-=======
-            requests.get(
-                'https://' + self.edsbyHost + '/core/node.json/' + str(self.studentData['unid']) + '?xds=Calendar',
-                cookies=self.getCookies(), headers=self.getHeaders()).json()["slices"][0]["data"]["caldata"]
->>>>>>> Correct formatting
 
     """
         Get calendar entries for all upcoming due assignments
