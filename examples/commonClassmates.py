@@ -8,7 +8,11 @@ import requests, json
 from edsby import Edsby
 
 print('Logging in...')
+<<<<<<< refs/remotes/origin/master
 edsby = Edsby(host='your_edsbyhost.edsby.com', username='your_username', password='your_password')
+=======
+edsby = Edsby(host='tcw.edsby.com', username='droizenman', password='CandyKinds.7')
+>>>>>>> Correct formatting
 print('Logged in.' if isinstance(edsby, object) else 'Login failed!')
 
 
@@ -58,6 +62,7 @@ def filterCommonClassmates(classData):
                     'name']:  # If we haven't added the student's name data yet
                     # Tuple of available name data. Sometimes MName is not present so there's a ternary expression for the middle name
                     studentName = (classData[classEntry]['classmates'][student]['FirstName'], (
+<<<<<<< refs/remotes/origin/master
 <<<<<<< HEAD
                         classData[classEntry]['classmates'][student]['MName'] if 'MName' in
                                                                                  classData[classEntry]['classmates'][
@@ -67,6 +72,11 @@ def filterCommonClassmates(classData):
                                                                              classData[classEntry]['classmates'][
                                                                                  student] else ''),
 >>>>>>> master
+=======
+                        classData[classEntry]['classmates'][student]['MName'] if 'MName' in
+                                                                                 classData[classEntry]['classmates'][
+                                                                                     student] else ''),
+>>>>>>> Correct formatting
                                    classData[classEntry]['classmates'][student]['LastName'])
                     commonClassmates[studentNID]['name'].extend(studentName)  # Add to common classmates dict
 
