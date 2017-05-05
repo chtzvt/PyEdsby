@@ -680,16 +680,13 @@ class Edsby(object):
     """
     def sendDirectMessage(self, message):
         payload = {
-            '_formkey': self.studentData['formkey'],
+            '_formkey':self.studentData['formkey'],
             'nodetype': message['nodetype'],
             'body': message['text'],
             'media-fill-include-integrations-integrationfiledata': message['filedata'],
             'media-fill-include-integrations-integrationfiles': message['files']
         }
-        return requests.post(
-            'https://' + self.edsbyHost +
-            '/core/create/' + message['to'] + '?xds=MessagesCompose&permaLinkKey=false&_processed=true',
-            data=payload, cookies=self.getCookies(), headers=self.getHeaders()).json()
+        return requests.post('https://'+self.edsbyHost+'/core/create/'+str(message['to'])+'?xds=MessagesCompose&permaLinkKey=false&_processed=true',data=payload,cookies=self.getCookies(),headers=self.getHeaders()).json()
 
     """
         Allows you to search for any higher level user (teacher, administrator)
