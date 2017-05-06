@@ -682,12 +682,11 @@ class Edsby(object):
         payload = {
             '_formkey':self.studentData['formkey'],
             'nodetype': message['nodetype'],
-            'to': message['to'],
             'body': message['text'],
             'media-fill-include-integrations-integrationfiledata': message['filedata'],
             'media-fill-include-integrations-integrationfiles': message['files']
         }
-        return requests.post('https://'+self.edsbyHost+'/core/create/38089?xds=MessagesCompose&permaLinkKey=false&_processed=true',data=payload,cookies=self.getCookies(),headers=self.getHeaders()).json()
+        return requests.post('https://'+self.edsbyHost+'/core/create/'+str(message['to'])+'?xds=MessagesCompose&permaLinkKey=false&_processed=true',data=payload,cookies=self.getCookies(),headers=self.getHeaders()).json()
 
     """
         Allows you to search for any higher level user (teacher, administrator)
