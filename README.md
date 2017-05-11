@@ -19,7 +19,7 @@ Everything you need to know is explained comprehensively in the [Wiki](https://g
 
 ## Notes
 
-First, let me apologize in advance for how convoluted the Edsby API is. I tried to abstract it all away as nicely as I could, but it's still a little crufty in places. With this library, however, it's much easier to work with. For this reason, I tried to keep the amount of processing done on the data returned minimal.
+Currently, Edsby does not expose any kind of public API (at least not for underprivileged users), so PyEdsby has to scrape data from the actual page content returned by Edsby's XDS endpoints. I tried to abstract it all away as nicely as I could, but it's still a little crufty in places. With this library, however, it's much easier to work with. For this reason, I tried to keep the amount of processing done on the data returned minimal. Should a publicly accessible API become available, however, PyEdsby will be updated appropriately. 
 
 Secondly, I can only guarantee that this works with my school's own Edsby instance. I'm assuming they're all more or less the same, but I've only got one instance to test with. The endpoints seem nonspecific enough, but I can't rule out the possibility that you might still need to make some minor tweaks to fit your specific environment.
 
@@ -36,8 +36,8 @@ Using PyEdsby, you could:
   - Write a script that forwards Edsby direct messages to your phone,  
   - And so much more!
 
-The only limits are your imagination, and whether or not Edsby is actually up and running (it goes down often). If you make something cool, let me know!
+The only limits are your imagination. If you make something cool, let me know!
 
 Best of luck, and enjoy! [Pull requests](https://github.com/ctrezevant/PyEdsby/pull/new/master) are always welcome:)
 
-_The Edsby trademark and brand are property of CoreFour, Inc. This software is unofficial and not supported by CoreFour in any way. I do not work for CoreFour (nor would I ever want to)._
+_The Edsby trademark and brand are property of CoreFour, Inc. This software is unofficial and not supported by CoreFour in any way. I do not work for CoreFour._
