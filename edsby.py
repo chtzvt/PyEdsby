@@ -1,4 +1,5 @@
 import requests, json
+from past.builtins import basestring
 
 """
     Edsby.py: An API wrapper/library for Python - v0.7.1
@@ -599,7 +600,7 @@ class Edsby(object):
     def getAllClassRosters(self):
         rosterData = self.getAllClasses()
         for NID in rosterData:
-            classData[NID]['classmates'] = self.getClassmates(NID)
+            rosterData[NID]['classmates'] = self.getClassmates(NID)
 
         return rosterData
 
@@ -882,3 +883,13 @@ class Edsby(object):
                 if attachmentPart:
                     localFile.write(attachmentPart)
         return filePath
+<<<<<<< Updated upstream
+=======
+
+    """
+        Retrieves the 'Edsby River' of school news available to the current user.
+    """
+    def getScrollingNews(self):
+        news = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=scrollingNews',cookies=self.getCookies(),headers=self.getHeaders()).json()
+        return news if 'item' in news['slices'][0]['data']['boxLayout']['newsbox'] else ''
+>>>>>>> Stashed changes
