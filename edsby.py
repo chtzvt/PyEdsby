@@ -895,7 +895,33 @@ class Edsby(object):
     """
     def getBaseActivity(self):
         nids = [self.studentData['nid']]
-        nids.extend(list(self.getCurrentClasses().keys()))
+        nids.extend(self.getCurrentClassNIDList())
         nids = '.'.join(str(e) for e in nids)
         activity = requests.get('https://'+self.edsbyHost+'/core/multinode.json/'+nids+'?xds=BaseActivity&combine=true',cookies=self.getCookies(),headers=self.getHeaders()).json()
         return activity if 'item' in activity['slices'][0]['data']['messages'] else ''
+
+    """
+        Returns a dict of dicts containing groups the user is a part of in this format:
+            'r<group RID>': {
+                'summary': {
+                    'about': {
+                        'type': 1,
+                        'name': "<group name>"
+                    },
+                    'name': "<group name>",
+                    'info': {
+                        'nposts': <number of posts>',
+                        'nmembers': <number of members>
+                    }
+                },
+                'nid': <group NID>,
+                'rid': <group RID>,
+                'nodetype': 3,
+                'pic': {
+                    'profpic': '<group NID>'
+                },
+                'nodesubtype': 1
+            }
+    """
+    def getRawGroupData(self):
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=MyGroups&combine=true',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['places']['item']
