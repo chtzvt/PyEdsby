@@ -889,3 +889,13 @@ class Edsby(object):
     def getScrollingNews(self):
         news = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=scrollingNews',cookies=self.getCookies(),headers=self.getHeaders()).json()
         return news if 'item' in news['slices'][0]['data']['boxLayout']['newsbox'] else ''
+
+    """
+        Retrieves the 'Recent Activity' section of the main Edsby page.
+    """
+    def getBaseActivity(self):
+        nids = [self.studentData['nid']]
+        nids.extend(list(self.getCurrentClasses().keys()))
+        nids = '.'.join(str(e) for e in nids)
+        activity = requests.get('https://'+self.edsbyHost+'/core/multinode.json/'+nids+'?xds=BaseActivity&combine=true',cookies=self.getCookies(),headers=self.getHeaders()).json()
+        return activity if 'item' in activity['slices'][0]['data']['messages'] else ''
