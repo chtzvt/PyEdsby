@@ -893,11 +893,11 @@ class Edsby(object):
     """
         Retrieves the 'Recent Activity' section of the main Edsby page.
     """
-    def getBaseActivity(self):
+    def getBaseActivity(self, spage=0):
         nids = [self.studentData['nid']]
         nids.extend(self.getCurrentClassNIDList())
         nids = '.'.join(str(e) for e in nids)
-        activity = requests.get('https://'+self.edsbyHost+'/core/multinode.json/'+nids+'?xds=BaseActivity&combine=true',cookies=self.getCookies(),headers=self.getHeaders()).json()
+        activity = requests.get('https://'+self.edsbyHost+'/core/multinode.json/'+nids+'?xds=BaseActivity&combine=true&spage='+str(spage),cookies=self.getCookies(),headers=self.getHeaders()).json()
         return activity if 'item' in activity['slices'][0]['data']['messages'] else ''
 
     """
