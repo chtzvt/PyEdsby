@@ -1,5 +1,6 @@
 import requests, json
 from past.builtins import basestring
+from copy import deepcopy
 
 """
     Edsby.py: An API wrapper/library for Python - v0.7.1
@@ -525,15 +526,20 @@ class Edsby(object):
                         assignmentData['no_scores_found'][assignmentNID][meta] = metadata[assg][meta]
 
         # Copy weighting data, sort assignments without it, calculate percentage scores if possible
-        for assg in assignmentData['assignments']:
+        deepcopy_assignmentData = deepcopy(assignmentData)
+        for assg in deepcopy_assignmentData['assignments']:
             assignmentNID = str(assg)
+
+            if 'scheme' not in assignmentData['assignments'][assg]:
+                del assignmentData['assignments'][assg]
+                continue
 
             if 'weighting' in assignmentData['assignments'][assg]: # If weighting data is present in the metadata we retrieved
                 # API sometimes returns a dict, other times returns a JSON string. Figure out which one it is and parse appropriately.
                 if isinstance(assignmentData['assignments'][assg]['weighting'], dict): # If dict access weighting prop as a dict
                     assignmentData['assignments'][assignmentNID]['weighting'] = assignmentData['assignments'][assg]['weighting']['0'] if '0' in assignmentData['assignments'][assg]['weighting'] else assignmentData['assignments'][assg]['weighting']
 
-                elif not isinstance(assignmentData['assignments'][assg]['weighting'], dict): # If string access weighting prop as a dict after running through a JSON parser
+                elif isinstance(assignmentData['assignments'][assg]['weighting'], basestring): # If string access weighting prop as a dict after running through a JSON parser
                     assignmentData['assignments'][assignmentNID]['weighting'] = json.loads(assignmentData['assignments'][assg]['weighting'])['0'] if '0' in json.loads(assignmentData['assignments'][assg]['weighting']) else json.loads(assignmentData['assignments'][assg]['weighting'])
             else:
                 assignmentData['assignments'][assignmentNID]['weighting'] = 'no_weighting_found' # No weighting data available for this entry, file it away
@@ -543,7 +549,7 @@ class Edsby(object):
                 if isinstance(assignmentData['assignments'][assg]['columns'], dict): # If dict access columns prop as a dict
                     assignmentData['assignments'][assignmentNID]['columns'] = assignmentData['assignments'][assg]['columns']['0'] if '0' in assignmentData['assignments'][assg]['columns'] else assignmentData['assignments'][assg]['columns']
 
-                elif not isinstance(assignmentData['assignments'][assg]['columns'], dict): # If string access columns prop as a dict after running through a JSON parser
+                elif not isinstance(assignmentData['assignments'][assg]['columns'], dict) and assignmentData['assignments'][assg]['scheme'] != 'gs_4levelplusminus': # If string access columns prop as a dict after running through a JSON parser
                     assignmentData['assignments'][assignmentNID]['columns'] = json.loads(assignmentData['assignments'][assg]['columns'])['0'] if '0' in json.loads(assignmentData['assignments'][assg]['columns']) else json.loads(assignmentData['assignments'][assg]['columns'])
             else:
                 assignmentData['assignments'][assignmentNID]['columns'] = 'no_columns_found' # No columns data available for this entry, file it away
@@ -558,6 +564,7 @@ class Edsby(object):
                         for scoreType in assignmentData['assignments'][assg]['score'].keys():
                             if scoreType in assignmentData['assignments'][assg]['columns']:
                                 assignmentData['assignments'][assg]['scorePercentage'][scoreType] = (float(assignmentData['assignments'][assg]['score'][scoreType])/float(assignmentData['assignments'][assg]['columns'][scoreType])) * 100
+
 
         return assignmentData
 
