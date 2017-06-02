@@ -556,7 +556,7 @@ class Edsby(object):
 
             # Calculate score percentage for assignment
             if 'columns' in assignmentData['assignments'][assg]: # If valid weighting data is present
-                if isinstance(assignmentData['assignments'][assg]['score'], (basestring, dict)) is False: # If the score is NOT a letter grade or a multi-part grade (e.g. is numeric), calculate percentage score.
+                if isinstance(assignmentData['assignments'][assg]['score'], (basestring, dict)) is False and assignmentData['assignments'][assg]['columns'] is not 'no_columns_found': # If the score is NOT a letter grade or a multi-part grade (e.g. is numeric), calculate percentage score.
                     assignmentData['assignments'][assg]['scorePercentage'] = (float(assignmentData['assignments'][assg]['score'])/float(assignmentData['assignments'][assg]['columns'])) * 100
                 elif isinstance(assignmentData['assignments'][assg]['score'], dict):
                     if isinstance(assignmentData['assignments'][assg]['columns'], dict):
