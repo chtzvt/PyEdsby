@@ -509,7 +509,7 @@ class Edsby(object):
         }
         for nid in scores: # Populates assignmentData with NIDs and available assignment scores
             if 'cols' in scores[nid]:
-                assignmentData['assignments'][nid] = {'score': scores[nid]['cols']['0']}
+                assignmentData['assignments'][nid] = {'score': scores[nid]['cols']['0']} if '0' in scores[nid]['cols'] else {'score': scores[nid]['cols']}
 
         # Copy all available assignment metadata to assignmentData dict
         for assg in metadata:
@@ -531,16 +531,16 @@ class Edsby(object):
             if 'weighting' in assignmentData['assignments'][assg]: # If weighting data is present in the metadata we retrieved
                 # API sometimes returns a dict, other times returns a JSON string. Figure out which one it is and parse appropriately.
                 if isinstance(assignmentData['assignments'][assg]['weighting'], dict): # If dict access weighting prop as a dict
-                    assignmentData['assignments'][assignmentNID]['weighting'] = assignmentData['assignments'][assg]['weighting']['0']
+                    assignmentData['assignments'][assignmentNID]['weighting'] = assignmentData['assignments'][assg]['weighting']['0'] if '0' in assignmentData['assignments'][assg]['weighting'] else assignmentData['assignments'][assg]['weighting']
 
-                elif isinstance(assignmentData['assignments'][assg]['weighting'], basestring): # If string access weighting prop as a dict after running through a JSON parser
-                    assignmentData['assignments'][assignmentNID]['weighting'] = json.loads(assignmentData['assignments'][assg]['weighting'])['0']
+                elif not isinstance(assignmentData['assignments'][assg]['weighting'], dict): # If string access weighting prop as a dict after running through a JSON parser
+                    assignmentData['assignments'][assignmentNID]['weighting'] = json.loads(assignmentData['assignments'][assg]['weighting'])['0'] if '0' in json.loads(assignmentData['assignments'][assg]['weighting']) else json.loads(assignmentData['assignments'][assg]['weighting'])
             else:
-                assignmentData['no_weights_found'].push(assignmentNID) # No weighting data available for this entry, file it away
+                assignmentData['no_weights_found'].append(assignmentNID) # No weighting data available for this entry, file it away
 
             # Calculate score percentage for assignment
             if 'weighting' in assignmentData['assignments'][assg]: # If valid weighting data is present
-                if isinstance(assignmentData['assignments'][assg]['score'], basestring) is False: # If the score is NOT a letter grade (e.g. is numeric), calculate percentage score.
+                if isinstance(assignmentData['assignments'][assg]['score'], (basestring, dict)) is False: # If the score is NOT a letter grade or a multi-part grade (e.g. is numeric), calculate percentage score.
                     assignmentData['assignments'][assg]['scorePercentage'] = (float(assignmentData['assignments'][assg]['score'])/float(assignmentData['assignments'][assg]['weighting'])) * 100
 
         return assignmentData
@@ -893,11 +893,11 @@ class Edsby(object):
     """
         Retrieves the 'Recent Activity' section of the main Edsby page.
     """
-    def getBaseActivity(self):
+    def getBaseActivity(self, spage=0):
         nids = [self.studentData['nid']]
         nids.extend(self.getCurrentClassNIDList())
         nids = '.'.join(str(e) for e in nids)
-        activity = requests.get('https://'+self.edsbyHost+'/core/multinode.json/'+nids+'?xds=BaseActivity&combine=true',cookies=self.getCookies(),headers=self.getHeaders()).json()
+        activity = requests.get('https://'+self.edsbyHost+'/core/multinode.json/'+nids+'?xds=BaseActivity&combine=true&spage='+str(spage),cookies=self.getCookies(),headers=self.getHeaders()).json()
         return activity if 'item' in activity['slices'][0]['data']['messages'] else ''
 
     """
@@ -925,3 +925,22 @@ class Edsby(object):
     """
     def getRawGroupData(self):
         return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=MyGroups&combine=true',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['places']['item']
+
+    """
+        Helper to generate download URL for a given user's profile pic. Edsby itself returns a default profile pic if one does not exist.
+    """
+    def getProfilePicDownloadURL(self, userNID, size=0):
+        if size > 0:
+            return 'https://'+self.edsbyHost+'/core/nodedl/'+str(userNID)+'?nodepic=true&field=file&xds=fileThumbnail&size='+str(size)+','+str(size)
+        else:
+            return 'https://' + self.edsbyHost + '/core/nodedl/' + str(userNID) + '?nodepic=true&field=file&xds=fileThumbnail'
+
+    """
+        Returns schedule for user for current date, or for targetDate if one is provided.
+        targetDate must be formatted as YYYYMMDD.
+    """
+    def getSchedule(self,targetDate=0):
+        if targetDate == 0:
+            return requests.get('https://' + self.edsbyHost + '/core/node.json/' + str(self.studentData['unid']) + '?xds=CalendarPanelNav_Student',cookies=self.getCookies(), headers=self.getHeaders()).json()['slices'][0]['data']['itemdata']
+        else:
+            return requests.get('https://' + self.edsbyHost + '/core/node.json/' + str(self.studentData['unid']) + '?xds=CalendarPanelNav_Student&targetDate='+str(targetDate), cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['itemdata']
