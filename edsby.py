@@ -477,14 +477,14 @@ class Edsby(object):
         "<NID>": {
             "sdate": "<guess: share date(?)>",
             "graded": <1 or 0, whether assignment was graded>,
-            "weighting": <maximum possible points for assignment>,
+            "weighting": <maximum possible points for assignment or something that makes no sense>,
             "rid": <assignment RID>,
             "state": "0", <- dunno what this is for
             "score": <number of points earned on an assignment>,
             "noavg": false, <whether or not the score was averaged?>
             "scheme": "gs_outof",  <maybe if assignments are points possible/max score?>
             "type": "0", <- dunno what this is for
-            "columns": "{\"0\":80}",  <- dunno what this is for
+            "columns": <maximum possible points for assignment float or dict for multi-part assignment>
             "fraction": "number/1", <- dunno what this is for. number looks like an NID(?)
             "summative": "1", <- dunno what this is for
             "nid": <assignment NID>,
@@ -536,12 +536,28 @@ class Edsby(object):
                 elif not isinstance(assignmentData['assignments'][assg]['weighting'], dict): # If string access weighting prop as a dict after running through a JSON parser
                     assignmentData['assignments'][assignmentNID]['weighting'] = json.loads(assignmentData['assignments'][assg]['weighting'])['0'] if '0' in json.loads(assignmentData['assignments'][assg]['weighting']) else json.loads(assignmentData['assignments'][assg]['weighting'])
             else:
-                assignmentData['no_weights_found'].append(assignmentNID) # No weighting data available for this entry, file it away
+                assignmentData['assignments'][assignmentNID]['weighting'] = 'no_weighting_found' # No weighting data available for this entry, file it away
+
+            if 'columns' in assignmentData['assignments'][assg]: # If columns data is present in the metadata we retrieved
+                # API sometimes returns a dict, other times returns a JSON string. Figure out which one it is and parse appropriately.
+                if isinstance(assignmentData['assignments'][assg]['columns'], dict): # If dict access columns prop as a dict
+                    assignmentData['assignments'][assignmentNID]['columns'] = assignmentData['assignments'][assg]['columns']['0'] if '0' in assignmentData['assignments'][assg]['columns'] else assignmentData['assignments'][assg]['columns']
+
+                elif not isinstance(assignmentData['assignments'][assg]['columns'], dict): # If string access columns prop as a dict after running through a JSON parser
+                    assignmentData['assignments'][assignmentNID]['columns'] = json.loads(assignmentData['assignments'][assg]['columns'])['0'] if '0' in json.loads(assignmentData['assignments'][assg]['columns']) else json.loads(assignmentData['assignments'][assg]['columns'])
+            else:
+                assignmentData['assignments'][assignmentNID]['columns'] = 'no_columns_found' # No columns data available for this entry, file it away
 
             # Calculate score percentage for assignment
-            if 'weighting' in assignmentData['assignments'][assg]: # If valid weighting data is present
+            if 'columns' in assignmentData['assignments'][assg]: # If valid weighting data is present
                 if isinstance(assignmentData['assignments'][assg]['score'], (basestring, dict)) is False: # If the score is NOT a letter grade or a multi-part grade (e.g. is numeric), calculate percentage score.
-                    assignmentData['assignments'][assg]['scorePercentage'] = (float(assignmentData['assignments'][assg]['score'])/float(assignmentData['assignments'][assg]['weighting'])) * 100
+                    assignmentData['assignments'][assg]['scorePercentage'] = (float(assignmentData['assignments'][assg]['score'])/float(assignmentData['assignments'][assg]['columns'])) * 100
+                elif isinstance(assignmentData['assignments'][assg]['score'], dict):
+                    if isinstance(assignmentData['assignments'][assg]['columns'], dict):
+                        assignmentData['assignments'][assg]['scorePercentage'] = {}
+                        for scoreType in assignmentData['assignments'][assg]['score'].keys():
+                            if scoreType in assignmentData['assignments'][assg]['columns']:
+                                assignmentData['assignments'][assg]['scorePercentage'][scoreType] = (float(assignmentData['assignments'][assg]['score'][scoreType])/float(assignmentData['assignments'][assg]['columns'][scoreType])) * 100
 
         return assignmentData
 
