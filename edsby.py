@@ -506,7 +506,10 @@ class Edsby(object):
         assignmentData = {
             'assignments': dict(), # Assignments that have all applicable metadata present
             'no_scores_found': dict(), # Assignments that we haven't found scores for
-            'no_weights_found': list() # Assignments we haven't found weights for
+            'no_weights_found': list(), # Assignments we haven't found weights for
+            'no_columns_found': list(), # Assignments we haven't found columns for
+            'invalid_weighting': list(), # Assignments that have invalid weighting
+            'invalid_columns': list() # Assignments that have invalid columns
         }
         for nid in scores: # Populates assignmentData with NIDs and available assignment scores
             if 'cols' in scores[nid]:
@@ -537,26 +540,47 @@ class Edsby(object):
             if 'weighting' in assignmentData['assignments'][assg]: # If weighting data is present in the metadata we retrieved
                 # API sometimes returns a dict, other times returns a JSON string. Figure out which one it is and parse appropriately.
                 if isinstance(assignmentData['assignments'][assg]['weighting'], dict): # If dict access weighting prop as a dict
-                    assignmentData['assignments'][assignmentNID]['weighting'] = assignmentData['assignments'][assg]['weighting']['0'] if '0' in assignmentData['assignments'][assg]['weighting'] else assignmentData['assignments'][assg]['weighting']
-
+                    if '0' in assignmentData['assignments'][assg]['weighting'] and not isinstance(assignmentData['assignments'][assg]['score'], dict):
+                        assignmentData['assignments'][assignmentNID]['weighting'] = assignmentData['assignments'][assg]['weighting']['0']
+                    elif len(assignmentData['assignments'][assg]['weighting']) is not len(assignmentData['assignments'][assg]['score']):
+                        assignmentData['invalid_weighting'].append(assignmentNID)
+                    else:
+                        assignmentData['assignments'][assignmentNID]['weighting'] = assignmentData['assignments'][assg]['weighting']
                 elif isinstance(assignmentData['assignments'][assg]['weighting'], basestring): # If string access weighting prop as a dict after running through a JSON parser
-                    assignmentData['assignments'][assignmentNID]['weighting'] = json.loads(assignmentData['assignments'][assg]['weighting'])['0'] if '0' in json.loads(assignmentData['assignments'][assg]['weighting']) else json.loads(assignmentData['assignments'][assg]['weighting'])
+                    weighting_dict = json.loads(assignmentData['assignments'][assg]['weighting'])
+                    if '0' in weighting_dict and not isinstance(assignmentData['assignments'][assg]['score'], dict):
+                        assignmentData['assignments'][assignmentNID]['weighting'] = json.loads(assignmentData['assignments'][assg]['weighting'])['0']
+                    elif len(weighting_dict) is not len(assignmentData['assignments'][assg]['score']):
+                        assignmentData['invalid_weighting'].append(assignmentNID)
+                    else:
+                        assignmentData['assignments'][assignmentNID]['weighting'] = weighting_dict
             else:
-                assignmentData['assignments'][assignmentNID]['weighting'] = 'no_weighting_found' # No weighting data available for this entry, file it away
+                assignmentData['no_weights_found'].append(assignmentNID) # No weighting data available for this entry, file it away
 
             if 'columns' in assignmentData['assignments'][assg]: # If columns data is present in the metadata we retrieved
                 # API sometimes returns a dict, other times returns a JSON string. Figure out which one it is and parse appropriately.
                 if isinstance(assignmentData['assignments'][assg]['columns'], dict): # If dict access columns prop as a dict
-                    assignmentData['assignments'][assignmentNID]['columns'] = assignmentData['assignments'][assg]['columns']['0'] if '0' in assignmentData['assignments'][assg]['columns'] else assignmentData['assignments'][assg]['columns']
+                    if '0' in assignmentData['assignments'][assg]['columns'] and not isinstance(assignmentData['assignments'][assg]['score'], dict):
+                        assignmentData['assignments'][assignmentNID]['columns'] = assignmentData['assignments'][assg]['columns']['0']
+                    elif len(assignmentData['assignments'][assg]['columns']) is not len(assignmentData['assignments'][assg]['score']):
+                        assignmentData['invalid_columns'].append(assignmentNID)
+                    else:
+                        assignmentData['assignments'][assignmentNID]['columns'] = assignmentData['assignments'][assg]['columns']
 
                 elif not isinstance(assignmentData['assignments'][assg]['columns'], dict) and assignmentData['assignments'][assg]['scheme'] != 'gs_4levelplusminus': # If string access columns prop as a dict after running through a JSON parser
-                    assignmentData['assignments'][assignmentNID]['columns'] = json.loads(assignmentData['assignments'][assg]['columns'])['0'] if '0' in json.loads(assignmentData['assignments'][assg]['columns']) else json.loads(assignmentData['assignments'][assg]['columns'])
+                    columns_dict = json.loads(assignmentData['assignments'][assg]['columns'])
+                    if '0' in columns_dict and not isinstance(assignmentData['assignments'][assg]['score'], dict):
+                        assignmentData['assignments'][assignmentNID]['columns'] = json.loads(assignmentData['assignments'][assg]['columns'])['0']
+                    elif len(columns_dict) is not len(assignmentData['assignments'][assg]['score']):
+                        assignmentData['invalid_columns'].append(assignmentNID)
+                    else:
+                        assignmentData['assignments'][assignmentNID]['columns'] = columns_dict
             else:
-                assignmentData['assignments'][assignmentNID]['columns'] = 'no_columns_found' # No columns data available for this entry, file it away
+                assignmentData['no_columns_found'].append(assignmentNID) # No columns data available for this entry, file it away
 
             # Calculate score percentage for assignment
             if 'columns' in assignmentData['assignments'][assg]: # If valid weighting data is present
-                if isinstance(assignmentData['assignments'][assg]['score'], (basestring, dict)) is False and 'columns' in assignmentData['assignments'][assg] and assignmentData['assignments'][assg]['columns'] is not 'no_columns_found': # If the score is NOT a letter grade or a multi-part grade (e.g. is numeric), calculate percentage score.
+                if isinstance(assignmentData['assignments'][assg]['score'], (basestring, dict)) is False and 'columns' in assignmentData['assignments'][assg]: # If the score is NOT a letter grade or a multi-part grade (e.g. is numeric), calculate percentage score.
                     assignmentData['assignments'][assg]['scorePercentage'] = (float(assignmentData['assignments'][assg]['score'])/float(assignmentData['assignments'][assg]['columns'])) * 100
                 elif isinstance(assignmentData['assignments'][assg]['score'], dict):
                     if isinstance(assignmentData['assignments'][assg]['columns'], dict):
