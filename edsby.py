@@ -988,6 +988,14 @@ class Edsby(object):
     """
     def getSchedule(self,targetDate=0):
         if targetDate == 0:
-            return requests.get('https://' + self.edsbyHost + '/core/node.json/' + str(self.studentData['unid']) + '?xds=CalendarPanelNav_Student',cookies=self.getCookies(), headers=self.getHeaders()).json()['slices'][0]['data']['itemdata']
+            schedule = requests.get('https://' + self.edsbyHost + '/core/node.json/' + str(self.studentData['unid']) + '?xds=CalendarPanelNav_Student',cookies=self.getCookies(), headers=self.getHeaders()).json()['slices'][0]['data']
+            if 'itemdata' in schedule:
+                return schedule['itemdata']
+            else:
+                return None
         else:
-            return requests.get('https://' + self.edsbyHost + '/core/node.json/' + str(self.studentData['unid']) + '?xds=CalendarPanelNav_Student&targetDate='+str(targetDate), cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['itemdata']
+            schedule = requests.get('https://' + self.edsbyHost + '/core/node.json/' + str(self.studentData['unid']) + '?xds=CalendarPanelNav_Student&targetDate='+str(targetDate), cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
+            if 'itemdata' in schedule:
+                return schedule['itemdata']
+            else:
+                return None
