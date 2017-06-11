@@ -181,7 +181,7 @@ class Edsby(object):
             'login-userid': loginData[0],
             'login-password': loginData[1],
             'login-host': self.edsbyHost,
-            'remember': ''
+            'remember': 1
         }
 
     """
@@ -190,6 +190,8 @@ class Edsby(object):
     """
     def sendAuthenticationData(self):
         studentData = requests.post('https://'+self.edsbyHost+'/core/login/'+str(self.instanceMeta['nid'])+'?xds=loginform&editable=true',data=self.authData,cookies=self.getCookies(),headers=self.getHeaders()).json()
+        if 'error' in studentData:
+            raise LoginError(studentData['errorstr'])
         return {
           'unid': studentData['unid'],
           'compiled': studentData['compiled'],
@@ -655,8 +657,8 @@ class Edsby(object):
         Retrieves the feed of all assignments and messages posted in the feed of a given class NID.
     """
     def getClassFeed(self, classNID):
-        feed = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=CourseFeed',cookies=self.getCookies(),headers=self.getHeaders()).json()
-        return feed if 'item' in feed['slices'][0]['data'] else ''
+        feed = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=CourseFeed',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
+        return feed if 'item' in feed else ''
 
     """
         Course calendar- returns calendar entries for the specified course
@@ -819,6 +821,28 @@ class Edsby(object):
         return requests.post('https://'+self.edsbyHost+'/core/create/'+str(classNID)+'?xds=CourseFeedMsg&xdsr=CourseFeed&rxdstype=ref&merge=merge',data=messageSubmission,cookies=self.getCookies(),headers=self.getHeaders()).json()['slice']['slices'][0]['data']['item']
 
     """
+        Posts a message in the class feed. This takes a dict called message, which looks like this:
+        {
+            'text': '<the message text>',
+            'url': '<an optional URL, shows up as a hyperlink in Edsby>',
+            'pin': 8,
+            'filedata': '',
+            'files': '',
+        }
+    """
+    def editMessageInClassFeed(self, classNID, feedItemRID, feedItemNID, message):
+        messageSubmission = {
+            '_formkey': self.studentData['formkey'],
+            'social-pin': message['pin'], # 8
+            'social-shmart-body': message['text'],
+            'social-shmart-url': message['url'],
+            'social-shmart-file-integrations-integrationfiledata': message['filedata'],
+            'social-shmart-file-integrations-integrationfiles': message['files']
+        }
+        return requests.post('https://'+self.edsbyHost+'/core/node/'+str(classNID)+'/'+str(feedItemRID)+'/'+str(feedItemNID)+'?xds=feedItemEdit&_i=2',data=messageSubmission,cookies=self.getCookies(),headers=self.getHeaders()).json()
+
+
+    """
         Posts a reply to a message in the class feed. This takes a dict called message, which looks like this:
         {
             'text': '<the message text>',
@@ -901,6 +925,16 @@ class Edsby(object):
         return requests.post('https://'+self.edsbyHost+'/core/node/'+str(classNID)+'/'+str(feedItemRID)+'/'+str(feedItemNID)+'?xds=doLike',data=likeData,cookies=self.getCookies(),headers=self.getHeaders()).json()
 
     """
+        Unlikes an item in the feed for a class
+    """
+    def unlikeItemInFeed(self, classNID, feedItemNID, feedItemRID):
+        likeData = {
+            'likes': None,
+            '_formkey': self.studentData['formkey']
+        }
+        return requests.post('https://'+self.edsbyHost+'/core/node/'+str(classNID)+'/'+str(feedItemRID)+'/'+str(feedItemNID)+'?xds=doLike',data=likeData,cookies=self.getCookies(),headers=self.getHeaders()).json()
+
+    """
         Retrieves metadata about files attached to feed items, should they be present
         If Edsby complains, call getClassFeed before using this function
     """
@@ -944,8 +978,8 @@ class Edsby(object):
         nids = [self.studentData['nid']]
         nids.extend(self.getCurrentClassNIDList())
         nids = '.'.join(str(e) for e in nids)
-        activity = requests.get('https://'+self.edsbyHost+'/core/multinode.json/'+nids+'?xds=BaseActivity&combine=true&spage='+str(spage),cookies=self.getCookies(),headers=self.getHeaders()).json()
-        return activity if 'item' in activity['slices'][0]['data']['messages'] else ''
+        activity = requests.get('https://'+self.edsbyHost+'/core/multinode.json/'+nids+'?xds=BaseActivity&combine=true&spage='+str(spage),cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['messages']
+        return activity if 'item' in activity else ''
 
     """
         Returns a dict of dicts containing groups the user is a part of in this format:
@@ -999,3 +1033,12 @@ class Edsby(object):
                 return schedule['itemdata']
             else:
                 return None
+
+
+class Error(Exception):
+    pass
+
+
+class LoginError(Error):
+    def __init__(self, message):
+        self.message = message
