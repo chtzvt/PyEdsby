@@ -145,7 +145,8 @@ class Edsby(object):
         metaTuples = list()
         for prop in meta: # for every entry in our array of conjoined k:vs:
             key = prop[0:prop.find(":")].strip() # Cut only the property out ([base]:'BasePublic')
-            value = prop[len(key)+1:-1].replace("'", "") # Cut out the value (base:['BasePublic']), remove leftover 's
+            key = key.replace('"',"")
+            value = prop[len(key)+3:].replace("'", "") # Cut out the value (base:['BasePublic']), remove leftover 's
             metaTuples.append((key, value)) # Build our array of (key, value) tuples
 
         # Convert the tuple array into a dict, and return it.
