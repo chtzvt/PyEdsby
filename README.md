@@ -2,6 +2,10 @@
 
 [Edsby](http://edsby.com/) doesn't have any sort of public API, so I did a little snooping to make a wrapper/library for it.
 
+# :warning: PyEdsby is Seeking Maintainers :warning:
+
+_Heads up! I haven't been able to maintain PyEdsby since 2018, and the project has been seeking both contributors and maintainers since then. As it stands, a [critical issue](https://github.com/ctrezevant/PyEdsby/issues/10) has broken authentication (and therefore the library), which I periodically receive requests to fix. Unfortunately, I don't have access to an Edsby instance to test on, so I'll leave this bug to the community in hopes that it can be fixed... -CT_ 
+
 ## Quickstart:
 ```python
 import requests, json
