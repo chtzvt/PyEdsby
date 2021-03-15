@@ -190,7 +190,9 @@ class Edsby(object):
         student metadata returned by Edsby
     """
     def sendAuthenticationData(self):
-        studentData = requests.post('https://'+self.edsbyHost+'/core/login/'+str(self.instanceMeta['nid'])+'?xds=loginform&editable=true',data=self.authData,cookies=self.getCookies(),headers=self.getHeaders()).json()
+        studentData = requests.post('https://'+self.edsbyHost+'/core/login/'+str(self.instanceMeta['nid'])+'?xds=loginform&editable=true',data=self.authData,cookies=self.getCookies(),headers=self.getHeaders())
+        self.setCookies(studentData.cookies)
+        studentData = studentData.json()
         if 'error' in studentData:
             raise LoginError(studentData['errorstr'])
         return {
@@ -266,7 +268,7 @@ class Edsby(object):
         },
     """
     def getRawCurrentClassData(self):
-        return self.getBaseStudentData()['slices'][0]['data']['col1']['classes']['classesContainer']['classes']
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=BaseStudentClasses&match=multi',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['classesContainer']['classes']
 
     """
         Returns a parsed list of only the classes you're currently enrolled in.
@@ -356,7 +358,7 @@ class Edsby(object):
             }
     """
     def getAllClasses(self):
-        rawClassData = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=ClassPicker&match=multi',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['class']
+        rawClassData = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=ClassPicker&match=multi',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['classes']
         classDict = dict()
         for className in rawClassData:
             NID = rawClassData[className]['nid']
