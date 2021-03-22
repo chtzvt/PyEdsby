@@ -619,7 +619,7 @@ class Edsby(object):
         Retrieves raw, unformatted attendance records from the specified class. I haven't tried to
         parse these yet.
     """
-    def getRawClassAttendenceRecords(self, classID):
+    def getRawClassAttendanceRecords(self, classID):
         return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classID)+'?xds=MyWorkChart&student='+str(self.studentData['unid']),cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['chartContainer']['chart']['attendanceRecords']['data']['right']['records']['incident']
 
     """
@@ -924,16 +924,18 @@ class Edsby(object):
 
     """
         Likes an item in the feed for a class
+        Call getClassFeed before this function to prevent errors
     """
     def likeItemInFeed(self, classNID, feedItemNID, feedItemRID):
         likeData = {
-            'likes': 10,
+            'likes': 1,
             '_formkey': self.studentData['formkey'],
         }
         return requests.post('https://'+self.edsbyHost+'/core/node/'+str(classNID)+'/'+str(feedItemRID)+'/'+str(feedItemNID)+'?xds=doLike',data=likeData,cookies=self.getCookies(),headers=self.getHeaders()).json()
 
     """
         Unlikes an item in the feed for a class
+        Call getClassFeed before this function to prevent errors
     """
     def unlikeItemInFeed(self, classNID, feedItemNID, feedItemRID):
         likeData = {
@@ -1042,6 +1044,104 @@ class Edsby(object):
             else:
                 return None
 
+    """
+        Returns the feed of all messages posted in the feed of a given group NID.
+    """
+    def getGroupFeed(self, groupNID, spage=0):
+        feed = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(groupNID)+'?xds=PlaceFeed&spage='+str(spage),cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
+        return feed if 'item' in feed else ''
+    
+    """
+        Returns calendar entries for a specified group.
+    """
+    def getGroupCalendar(self, groupNID):
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(groupNID)+'?xds=CalendarPanel_Place',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
+
+    """
+        Returns recent group members with last active date and time.
+    """
+    def getGroupActiveList(self, groupNID):
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(groupNID)+'?xds=GroupActiveList',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['places']['item']
+
+    """
+        Returns all group members.
+    """
+    def getFullGroupRoster(self, groupNID):
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(groupNID)+'?xds=ConferenceMemberList',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['places']['item']
+
+    """
+        Returns poll data for a specified poll. The same info is returned in getClassFeed or getGroupFeed.
+        Call getGroupFeed or getClassFeed (as applicable) before this to prevent errors.
+    """
+    def getPollData(self, groupNID, pollNID, pollRID):
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(groupNID)+'/'+str(pollRID)+'/'+str(pollNID)+'?xds=FIBPoll',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
+
+    """
+        Allows you to vote on items. Should work for classes to, though has only been tested with groups.
+        Call getGroupFeed or getClassFeed (as applicable) before this to prevent errors.
+    """
+    def voteItemInFeed(self, groupNID, pollNID, pollRID, pollVote):
+        voteData = {
+            'vote': pollVote,
+            '_formkey': self.studentData['formkey'],
+        }
+        return requests.post('https://'+self.edsbyHost+'/core/node/'+str(groupNID)+'/'+str(pollRID)+'/'+str(pollNID)+'?xds=PollVote',data=voteData,cookies=self.getCookies(),headers=self.getHeaders()).json()
+
+    """
+        Allows you to pin a message in a group.
+        Call getRawGroupData before this to prevent errors.
+        Untested in classes, theorize that it should work.
+    """
+    def pinFeedItem(self, groupNID, feedItemRID):
+        pinData = {
+            '_formkey': self.studentData['formkey'],
+            'field': 1,
+            'rid': feedItemRID,
+            'value': 1,
+        }
+        return requests.post('https://'+self.edsbyHost+'/core/putlink/'+str(groupNID)+'?xds=pin',data=pinData,cookies=self.getCookies(),headers=self.getHeaders()).json()
+
+    """
+        Allows you to pin a message in a group.
+        Call getRawGroupData before this to prevent errors.
+        Untested in classes, theorize that it should work.
+    """
+    def unpinFeedItem(self, groupNID, feedItemRID):
+        pinData = {
+            '_formkey': self.studentData['formkey'],
+            'field': 1,
+            'rid': feedItemRID,
+            'value': 0,
+        }
+        return requests.post('https://'+self.edsbyHost+'/core/putlink/'+str(groupNID)+'?xds=pin',data=pinData,cookies=self.getCookies(),headers=self.getHeaders()).json()
+
+    """
+        Posts a message in the group feed. This takes a dict called message, which looks like this:
+        {
+            'text': '<the message text>',
+            'url': '<an optional URL, shows up as a hyperlink in Edsby>',
+            'pin': 8,
+            'nodetype': 4,
+            'node_subtype': 0,
+            'filedata': '',
+            'files': '',
+        }
+    """
+    def postMessageInGroupFeed(self, groupNID, message):
+        messageSubmission = {
+            '_formkey': self.studentData['formkey'],
+            'social-pin': message['pin'], # 8
+            'social-shmart-nodetype': message['nodetype'], # 4
+            'social-shmart-nodesubtype': message['node_subtype'], # 0
+            'social-shmart-body-body': message['text'],
+            'social-shmart-url': message['url'],
+            'social-tools-addresources-integrations-integrationfiledata': message['filedata'],
+            'social-tools-addresources-integrations-integrationfiles': message['files']
+        }
+        return requests.post('https://'+self.edsbyHost+'/core/create/'+str(groupNID)+'?xds=feedmsg&xdsr=PlaceFeed&rxdstype=ref&noDirtyForm=true',data=messageSubmission,cookies=self.getCookies(),headers=self.getHeaders()).json()['slice']['slices'][0]['data']['item']
+    
+    
+    # TODO: file uploads in group feeds
 
 class Error(Exception):
     pass
