@@ -1,6 +1,7 @@
 import requests, json
 from past.builtins import basestring
 from copy import deepcopy
+from datetime import date
 
 """
     Edsby.py: An API wrapper/library for Python - v0.7.1
@@ -191,11 +192,11 @@ class Edsby(object):
     """
     def sendAuthenticationData(self):
         studentData = requests.post('https://'+self.edsbyHost+'/core/login/'+str(self.instanceMeta['nid'])+'?xds=loginform&editable=true',data=self.authData,cookies=self.getCookies(),headers=self.getHeaders())
-        nookies = {
+        cookies = {
             'session_id_edsby': dict(studentData.cookies)['session_id_edsby'],
-            '__cfduid': dict(self.getCookies())['__cfduid']
+            '__cfduid': dict(self.getCookies())['__cfduid'],
         }
-        self.setCookies(nookies)
+        self.setCookies(cookies)
         studentData = studentData.json()
         if 'error' in studentData:
             raise LoginError(studentData['errorstr'])
@@ -204,8 +205,8 @@ class Edsby(object):
           'compiled': studentData['compiled'],
           'nid': studentData['slices'][0]['nid'],
           'name': studentData['slices'][0]['data']['name'],
-          'guid' : studentData['slices'][0]['data']['guid'],
-          'formkey' : studentData['slices'][0]['data']['formkey']
+          'guid': studentData['slices'][0]['data']['guid'],
+          'formkey': studentData['slices'][0]['data']['formkey']
         }
 
     """
@@ -668,7 +669,7 @@ class Edsby(object):
         return feed if 'item' in feed else ''
 
     """
-        Course calendar- returns calendar entries for the specified course
+        Course calendar- returns calendar entries for the specified course.
     """
     def getClassCalendar(self, classNID):
         return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=CalendarPanel_Class',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
@@ -686,10 +687,12 @@ class Edsby(object):
         return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=notifications',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
 
     """
-        Returns all available calendar data (due/overdue assignments, events, schedules)
+        Returns all available calendar data (due/overdue assignments, events, schedules).
+        By default, returns data for the current month. 
+        Call with a different date (formatted year-month-day) to get calendar data for that month.
     """
-    def getCalendarData(self):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=Calendar',cookies=self.getCookies(),headers=self.getHeaders()).json()["slices"][0]["data"]["caldata"]
+    def getCalendarData(self, date=date.today().strftime("%Y-%m-%d")):
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=Calendar&targetDate='+str(date),cookies=self.getCookies(),headers=self.getHeaders()).json()["slices"][0]["data"]["caldata"]
 
     """
         Get calendar entries for all upcoming due assignments
@@ -1014,7 +1017,7 @@ class Edsby(object):
                 'nodesubtype': 1
             }
     """
-    def getRawGroupData(self):
+    def getStudentGroups(self):
         return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=MyGroups&combine=true',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['places']['item']
 
     """
@@ -1139,9 +1142,74 @@ class Edsby(object):
             'social-tools-addresources-integrations-integrationfiles': message['files']
         }
         return requests.post('https://'+self.edsbyHost+'/core/create/'+str(groupNID)+'?xds=feedmsg&xdsr=PlaceFeed&rxdstype=ref&noDirtyForm=true',data=messageSubmission,cookies=self.getCookies(),headers=self.getHeaders()).json()['slice']['slices'][0]['data']['item']
-    
-    
-    # TODO: file uploads in group feeds
+
+    """
+        Posts a message with an accompanying file in the group feed. This takes a dict called message,
+        which looks like this:
+        {
+            'text': '<the message text>',
+            'url': '<an optional URL, shows up as a hyperlink in Edsby>',
+            'pin': 10,
+            'nodetype': 4,
+            'node_subtype': 0,
+            'filedata': '',
+            'files': '',
+        }
+            TODO - Edsby complains of an invalid key when attempting to upload. Suspect form data formatting in POST.
+    """
+    def postFileInGroupFeed(self, groupNID, message, fileName, filePath):
+        uploadData = {
+            '_formkey': self.studentData['formkey'],
+            'name': fileName,
+            'nodetype': '5.9',
+            'pin': '2'
+        }
+        
+        files=[('upload',(fileName,open(filePath,'rb'),'application/octet-stream'))]
+        
+        response = requests.post('https://'+self.edsbyHost+'/core/create.json/tmp?xds=MultiFileUploaderNoThumbnailing&nodetype=5.9&temp=tmp',files=files, data=uploadData,cookies=self.getCookies(),headers=self.getHeaders()).json()
+                
+        messageSubmission = {
+            '_formkey': self.studentData['formkey'],
+            'social-pin': message['pin'], # 10
+            'social-shmart-nodetype': message['nodetype'], # 4
+            'social-shmart-nodesubtype': message['node_subtype'], # 0
+            'social-shmart-body-body': message['text'],
+            'social-shmart-url': message['url'],
+            'social-tools-addresources-integrations-integrationfiledata': message['filedata'], # pin:2
+            'social-tools-addresources-integrations-integrationfiles': message['files'],
+            'social-tools-addresources-linkFiles': response['nid'],
+            'social-tools-addresources-linkRich': response['nid']
+        }
+        return requests.post('https://'+self.edsbyHost+'/core/create/'+str(groupNID)+'?xds=feedmsg&xdsr=PlaceFeed&rxdstype=ref&noDirtyForm=true',data=messageSubmission,cookies=self.getCookies(),headers=self.getHeaders()).json()['slice']['slices'][0]['data']['item']
+            
+
+        
+
+    """
+        Deletes specified post in a group. 
+        Works with top level posts and comments.
+    """
+    def deletePostInGroupFeed(self, groupNID, postRID):
+        body = {
+            '_formkey': self.studentData['formkey'],
+            'field': 8,
+            'rid': postRID,
+            'value': 0
+        }
+        return requests.post('https://'+self.edsbyHost+'/core/putlink/'+str(groupNID)+'?xds=pin',data=body,cookies=self.getCookies(),headers=self.getHeaders()).json()
+
+    """
+        Returns raw data from a specified group.
+    """
+    def getRawGroupData(self, groupNID):
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(groupNID)+'?xds=Place',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]
+
+    """
+        Returns all moderators of a specified group.
+    """
+    def getGroupModerators(self , groupNID):
+        return self.getRawGroupData(groupNID)['data']['col1']['moderators']
 
 class Error(Exception):
     pass
