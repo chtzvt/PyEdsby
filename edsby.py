@@ -1,6 +1,7 @@
 import requests, json
 from past.builtins import basestring
 from copy import deepcopy
+from datetime import date
 
 """
     Edsby.py: An API wrapper/library for Python - v0.7.1
@@ -190,7 +191,13 @@ class Edsby(object):
         student metadata returned by Edsby
     """
     def sendAuthenticationData(self):
-        studentData = requests.post('https://'+self.edsbyHost+'/core/login/'+str(self.instanceMeta['nid'])+'?xds=loginform&editable=true',data=self.authData,cookies=self.getCookies(),headers=self.getHeaders()).json()
+        studentData = requests.post('https://'+self.edsbyHost+'/core/login/'+str(self.instanceMeta['nid'])+'?xds=loginform&editable=true',data=self.authData,cookies=self.getCookies(),headers=self.getHeaders())
+        cookies = {
+            'session_id_edsby': dict(studentData.cookies)['session_id_edsby'],
+            '__cfduid': dict(self.getCookies())['__cfduid'],
+        }
+        self.setCookies(cookies)
+        studentData = studentData.json()
         if 'error' in studentData:
             raise LoginError(studentData['errorstr'])
         return {
@@ -198,8 +205,8 @@ class Edsby(object):
           'compiled': studentData['compiled'],
           'nid': studentData['slices'][0]['nid'],
           'name': studentData['slices'][0]['data']['name'],
-          'guid' : studentData['slices'][0]['data']['guid'],
-          'formkey' : studentData['slices'][0]['data']['formkey']
+          'guid': studentData['slices'][0]['data']['guid'],
+          'formkey': studentData['slices'][0]['data']['formkey']
         }
 
     """
@@ -266,7 +273,7 @@ class Edsby(object):
         },
     """
     def getRawCurrentClassData(self):
-        return self.getBaseStudentData()['slices'][0]['data']['col1']['classes']['classesContainer']['classes']
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=BaseStudentClasses&match=multi',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['classesContainer']['classes']
 
     """
         Returns a parsed list of only the classes you're currently enrolled in.
@@ -341,7 +348,7 @@ class Edsby(object):
             }
     """
     def getRawClassData(self):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=ClassPicker&match=multi',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['class']
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=ClassPicker&match=multi',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['classes']
 
     """
         Returns a parsed list of all available classes, both current and previous.
@@ -356,7 +363,7 @@ class Edsby(object):
             }
     """
     def getAllClasses(self):
-        rawClassData = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=ClassPicker&match=multi',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['class']
+        rawClassData = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=ClassPicker&match=multi',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['classes']
         classDict = dict()
         for className in rawClassData:
             NID = rawClassData[className]['nid']
@@ -400,7 +407,7 @@ class Edsby(object):
     def getPastClasses(self):
         currentClasses = self.getCurrentClassNIDList()
         allClasses = self.getAllClasses()
-        for classNID in allClasses:
+        for classNID in list(allClasses):
             if classNID in currentClasses:
                 del allClasses[classNID]
         return allClasses
@@ -613,8 +620,8 @@ class Edsby(object):
         Retrieves raw, unformatted attendance records from the specified class. I haven't tried to
         parse these yet.
     """
-    def getRawClassAttendenceRecords(self, classID):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classID)+'?xds=MyWorkChart&student='+str(self.studentData['unid']),cookies=self.getCookies(),headers=self.getHeaders()).json()['data']['chartContainer']['chart']['attendanceRecords']['data']['right']['records']['incident']
+    def getRawClassAttendanceRecords(self, classID):
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classID)+'?xds=MyWorkChart&student='+str(self.studentData['unid']),cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['chartContainer']['chart']['attendanceRecords']['data']['right']['records']['incident']
 
     """
         Returns a list of all member students of a class
@@ -662,7 +669,7 @@ class Edsby(object):
         return feed if 'item' in feed else ''
 
     """
-        Course calendar- returns calendar entries for the specified course
+        Course calendar- returns calendar entries for the specified course.
     """
     def getClassCalendar(self, classNID):
         return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(classNID)+'?xds=CalendarPanel_Class',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
@@ -680,10 +687,12 @@ class Edsby(object):
         return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=notifications',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
 
     """
-        Returns all available calendar data (due/overdue assignments, events, schedules)
+        Returns all available calendar data (due/overdue assignments, events, schedules).
+        By default, returns data for the current month. 
+        Call with a different date (formatted year-month-day) to get calendar data for that month.
     """
-    def getCalendarData(self):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=Calendar',cookies=self.getCookies(),headers=self.getHeaders()).json()["slices"][0]["data"]["caldata"]
+    def getCalendarData(self, date=date.today().strftime("%Y-%m-%d")):
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['unid'])+'?xds=Calendar&targetDate='+str(date),cookies=self.getCookies(),headers=self.getHeaders()).json()["slices"][0]["data"]["caldata"]
 
     """
         Get calendar entries for all upcoming due assignments
@@ -702,8 +711,9 @@ class Edsby(object):
     """
     def getCalendarEvents(self):
         calendar = self.getCalendarData()
-        for key in calendar['common'].keys:
-            calendar['common'][str(key)] = calendar['events'][str(key)]
+        for key in list(calendar['common']):
+            if str(key + '.0') in list(calendar['events']):
+                calendar['common'][str(key)] = calendar['events'][str(key + '.0')]
         return calendar['common']
 
     """
@@ -724,20 +734,21 @@ class Edsby(object):
         {
             'nodetype': 4.0,
             'to': NID of user,
-            'body': message text,
-            'media-fill-include-integrations-integrationfiledata': file data(?),
-            'media-fill-include-integrations-integrationfiles': more file data?
+            'text': message text,
+            'filedata': file data(?),
+            'files': more file data?
         }
     """
     def sendDirectMessage(self, message):
         payload = {
             '_formkey':self.studentData['formkey'],
+            'form-composeBody': str(message['text']),
+            'form-media-fill-addresources-integrations-integrationfiledata': message['filedata'],
+            'form-media-fill-addresources-integrations-integrationfiles': message['files'],
             'nodetype': message['nodetype'],
-            'body': message['text'],
-            'media-fill-include-integrations-integrationfiledata': message['filedata'],
-            'media-fill-include-integrations-integrationfiles': message['files']
+
         }
-        return requests.post('https://'+self.edsbyHost+'/core/create/'+str(message['to'])+'?xds=MessagesCompose&permaLinkKey=false&_processed=true',data=payload,cookies=self.getCookies(),headers=self.getHeaders()).json()
+        return requests.post('https://'+self.edsbyHost+'/core/create/'+str(message['to'])+'?xds=MessagesCompose&permaLinkKey=false&scopeState=true&_processed=true',data=payload,cookies=self.getCookies(),headers=self.getHeaders()).json() 
 
     """
         Allows you to search for any higher level user (teacher, administrator)
@@ -772,7 +783,6 @@ class Edsby(object):
                 "url": metadata['href'],
                 "type": metadata['type'],
                 "code": metadata['code'],
-                "embedstatus": metadata['embedstatus'],
                 "href": metadata['href'],
                 "thumbnail": metadata['thumbnail'] if 'thumbnail' in metadata else '',
                 "title": metadata['title'] if 'title' in metadata else '',
@@ -917,16 +927,18 @@ class Edsby(object):
 
     """
         Likes an item in the feed for a class
+        Call getClassFeed before this function to prevent errors
     """
     def likeItemInFeed(self, classNID, feedItemNID, feedItemRID):
         likeData = {
             'likes': 1,
-            '_formkey': self.studentData['formkey']
+            '_formkey': self.studentData['formkey'],
         }
         return requests.post('https://'+self.edsbyHost+'/core/node/'+str(classNID)+'/'+str(feedItemRID)+'/'+str(feedItemNID)+'?xds=doLike',data=likeData,cookies=self.getCookies(),headers=self.getHeaders()).json()
 
     """
         Unlikes an item in the feed for a class
+        Call getClassFeed before this function to prevent errors
     """
     def unlikeItemInFeed(self, classNID, feedItemNID, feedItemRID):
         likeData = {
@@ -940,7 +952,7 @@ class Edsby(object):
         If Edsby complains, call getClassFeed before using this function
     """
     def getAttachmentMetadata(self, feedItemNID, attachmentNID):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(feedItemNID)+'/'+str(attachmentNID)+'?xds=AlbumFileView',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['item']
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(feedItemNID)+'/'+str(attachmentNID)+'?xds=AlbumFileView',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['contents']
 
     """
         Generates the URL to download a particular file from Edsby, as such URLs are long and verbose.
@@ -979,7 +991,7 @@ class Edsby(object):
         nids = [self.studentData['nid']]
         nids.extend(self.getCurrentClassNIDList())
         nids = '.'.join(str(e) for e in nids)
-        activity = requests.get('https://'+self.edsbyHost+'/core/multinode.json/'+nids+'?xds=BaseActivity&combine=true&spage='+str(spage),cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['messages']
+        activity = requests.get('https://'+self.edsbyHost+'/core/multinode.json/'+nids+'?xds=BaseActivity&spage='+str(spage),cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['messages']
         return activity if 'item' in activity else ''
 
     """
@@ -1005,7 +1017,7 @@ class Edsby(object):
                 'nodesubtype': 1
             }
     """
-    def getRawGroupData(self):
+    def getStudentGroups(self):
         return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(self.studentData['nid'])+'?xds=MyGroups&combine=true',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['places']['item']
 
     """
@@ -1035,6 +1047,169 @@ class Edsby(object):
             else:
                 return None
 
+    """
+        Returns the feed of all messages posted in the feed of a given group NID.
+    """
+    def getGroupFeed(self, groupNID, spage=0):
+        feed = requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(groupNID)+'?xds=PlaceFeed&spage='+str(spage),cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
+        return feed if 'item' in feed else ''
+    
+    """
+        Returns calendar entries for a specified group.
+    """
+    def getGroupCalendar(self, groupNID):
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(groupNID)+'?xds=CalendarPanel_Place',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
+
+    """
+        Returns recent group members with last active date and time.
+    """
+    def getGroupActiveList(self, groupNID):
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(groupNID)+'?xds=GroupActiveList',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['places']['item']
+
+    """
+        Returns all group members.
+    """
+    def getFullGroupRoster(self, groupNID):
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(groupNID)+'?xds=ConferenceMemberList',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']['places']['item']
+
+    """
+        Returns poll data for a specified poll. The same info is returned in getClassFeed or getGroupFeed.
+        Call getGroupFeed or getClassFeed (as applicable) before this to prevent errors.
+    """
+    def getPollData(self, groupNID, pollNID, pollRID):
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(groupNID)+'/'+str(pollRID)+'/'+str(pollNID)+'?xds=FIBPoll',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
+
+    """
+        Allows you to vote on items. Should work for classes to, though has only been tested with groups.
+        Call getGroupFeed or getClassFeed (as applicable) before this to prevent errors.
+    """
+    def voteItemInFeed(self, groupNID, pollNID, pollRID, pollVote):
+        voteData = {
+            'vote': pollVote,
+            '_formkey': self.studentData['formkey'],
+        }
+        return requests.post('https://'+self.edsbyHost+'/core/node/'+str(groupNID)+'/'+str(pollRID)+'/'+str(pollNID)+'?xds=PollVote',data=voteData,cookies=self.getCookies(),headers=self.getHeaders()).json()
+
+    """
+        Allows you to pin a message in a group.
+        Call getRawGroupData before this to prevent errors.
+        Untested in classes, theorize that it should work.
+    """
+    def pinFeedItem(self, groupNID, feedItemRID):
+        pinData = {
+            '_formkey': self.studentData['formkey'],
+            'field': 1,
+            'rid': feedItemRID,
+            'value': 1,
+        }
+        return requests.post('https://'+self.edsbyHost+'/core/putlink/'+str(groupNID)+'?xds=pin',data=pinData,cookies=self.getCookies(),headers=self.getHeaders()).json()
+
+    """
+        Allows you to pin a message in a group.
+        Call getRawGroupData before this to prevent errors.
+        Untested in classes, theorize that it should work.
+    """
+    def unpinFeedItem(self, groupNID, feedItemRID):
+        pinData = {
+            '_formkey': self.studentData['formkey'],
+            'field': 1,
+            'rid': feedItemRID,
+            'value': 0,
+        }
+        return requests.post('https://'+self.edsbyHost+'/core/putlink/'+str(groupNID)+'?xds=pin',data=pinData,cookies=self.getCookies(),headers=self.getHeaders()).json()
+
+    """
+        Posts a message in the group feed. This takes a dict called message, which looks like this:
+        {
+            'text': '<the message text>',
+            'url': '<an optional URL, shows up as a hyperlink in Edsby>',
+            'pin': 8,
+            'nodetype': 4,
+            'node_subtype': 0,
+            'filedata': '',
+            'files': '',
+        }
+    """
+    def postMessageInGroupFeed(self, groupNID, message):
+        messageSubmission = {
+            '_formkey': self.studentData['formkey'],
+            'social-pin': message['pin'], # 8
+            'social-shmart-nodetype': message['nodetype'], # 4
+            'social-shmart-nodesubtype': message['node_subtype'], # 0
+            'social-shmart-body-body': message['text'],
+            'social-shmart-url': message['url'],
+            'social-tools-addresources-integrations-integrationfiledata': message['filedata'],
+            'social-tools-addresources-integrations-integrationfiles': message['files']
+        }
+        return requests.post('https://'+self.edsbyHost+'/core/create/'+str(groupNID)+'?xds=feedmsg&xdsr=PlaceFeed&rxdstype=ref&noDirtyForm=true',data=messageSubmission,cookies=self.getCookies(),headers=self.getHeaders()).json()['slice']['slices'][0]['data']['item']
+
+    """
+        Posts a message with an accompanying file in the group feed. This takes a dict called message,
+        which looks like this:
+        {
+            'text': '<the message text>',
+            'url': '<an optional URL, shows up as a hyperlink in Edsby>',
+            'pin': 10,
+            'nodetype': 4,
+            'node_subtype': 0,
+            'filedata': '',
+            'files': '',
+        }
+            TODO - Edsby complains of an invalid key when attempting to upload. Suspect form data formatting in POST.
+    """
+    def postFileInGroupFeed(self, groupNID, message, fileName, filePath):
+        uploadData = {
+            '_formkey': self.studentData['formkey'],
+            'name': fileName,
+            'nodetype': '5.9',
+            'pin': '2'
+        }
+        
+        files=[('upload',(fileName,open(filePath,'rb'),'application/octet-stream'))]
+        
+        response = requests.post('https://'+self.edsbyHost+'/core/create.json/tmp?xds=MultiFileUploaderNoThumbnailing&nodetype=5.9&temp=tmp',files=files, data=uploadData,cookies=self.getCookies(),headers=self.getHeaders()).json()
+                
+        messageSubmission = {
+            '_formkey': self.studentData['formkey'],
+            'social-pin': message['pin'], # 10
+            'social-shmart-nodetype': message['nodetype'], # 4
+            'social-shmart-nodesubtype': message['node_subtype'], # 0
+            'social-shmart-body-body': message['text'],
+            'social-shmart-url': message['url'],
+            'social-tools-addresources-integrations-integrationfiledata': message['filedata'], # pin:2
+            'social-tools-addresources-integrations-integrationfiles': message['files'],
+            'social-tools-addresources-linkFiles': response['nid'],
+            'social-tools-addresources-linkRich': response['nid']
+        }
+        return requests.post('https://'+self.edsbyHost+'/core/create/'+str(groupNID)+'?xds=feedmsg&xdsr=PlaceFeed&rxdstype=ref&noDirtyForm=true',data=messageSubmission,cookies=self.getCookies(),headers=self.getHeaders()).json()['slice']['slices'][0]['data']['item']
+            
+
+        
+
+    """
+        Deletes specified post in a group. 
+        Works with top level posts and comments.
+    """
+    def deletePostInGroupFeed(self, groupNID, postRID):
+        body = {
+            '_formkey': self.studentData['formkey'],
+            'field': 8,
+            'rid': postRID,
+            'value': 0
+        }
+        return requests.post('https://'+self.edsbyHost+'/core/putlink/'+str(groupNID)+'?xds=pin',data=body,cookies=self.getCookies(),headers=self.getHeaders()).json()
+
+    """
+        Returns raw data from a specified group.
+    """
+    def getRawGroupData(self, groupNID):
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(groupNID)+'?xds=Place',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]
+
+    """
+        Returns all moderators of a specified group.
+    """
+    def getGroupModerators(self , groupNID):
+        return self.getRawGroupData(groupNID)['data']['col1']['moderators']
 
 class Error(Exception):
     pass
