@@ -40,6 +40,10 @@ Using PyEdsby, you could:
   - Write a script that forwards Edsby direct messages to your phone,  
   - And so much more!
 
+More cool projects using PyEdsby include:
+  - [drEdsby](https://github.com/SethDamiani/drEdsby), a complete redesign of the Edsby frontend
+  - [PyEdsby-CLI](https://github.com/SethDamiani/PyEdsby-CLI), a command-line interface for Edsby 
+
 The only limits are your imagination. If you make something cool, let me know!
 
 Best of luck, and enjoy! [Pull requests](https://github.com/ctrezevant/PyEdsby/pull/new/master) are always welcome:)
