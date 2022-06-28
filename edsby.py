@@ -18,6 +18,7 @@ from datetime import date
     This software is unofficial and not supported by CoreFour in any way.
 """
 
+
 class Edsby(object):
     def __init__(self, **kwargs):
         self.edsbyHost = kwargs['host']
@@ -149,7 +150,6 @@ class Edsby(object):
             key = key.replace('"',"")
             value = prop[len(key)+3:].replace("'", "") # Cut out the value (base:['BasePublic']), remove leftover 's
             metaTuples.append((key, value)) # Build our array of (key, value) tuples
-
         # Convert the tuple array into a dict, and return it.
         # For more on the theory behind this, have a look at https://docs.python.org/2/tutorial/datastructures.html#tut-listcomps
         return dict(metaTuples)
@@ -194,7 +194,6 @@ class Edsby(object):
         studentData = requests.post('https://'+self.edsbyHost+'/core/login/'+str(self.instanceMeta['nid'])+'?xds=loginform&editable=true',data=self.authData,cookies=self.getCookies(),headers=self.getHeaders())
         cookies = {
             'session_id_edsby': dict(studentData.cookies)['session_id_edsby'],
-            '__cfduid': dict(self.getCookies())['__cfduid'],
         }
         self.setCookies(cookies)
         studentData = studentData.json()
@@ -1077,7 +1076,15 @@ class Edsby(object):
         Call getGroupFeed or getClassFeed (as applicable) before this to prevent errors.
     """
     def getPollData(self, groupNID, pollNID, pollRID):
-        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(groupNID)+'/'+str(pollRID)+'/'+str(pollNID)+'?xds=FIBPoll',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(groupNID)+'/'+str(pollRID)+'/'+str(pollNID)+'?xds=FIBPoll',cookies=self.getCookies(),headers=self.getHeaders()).json()
+
+    """
+        Returns all voters for a specified poll.
+        Call getGroupFeed or getClassFeed (as applicable) before this to prevent errors.
+    """
+
+    def getPollVoters(self, groupNID, pollNID, pollRID):
+        return requests.get('https://'+self.edsbyHost+'/core/node.json/'+str(groupNID)+'/'+str(pollRID)+'/'+str(pollNID)+'?xds=PollGetVoters',cookies=self.getCookies(),headers=self.getHeaders()).json()['slices'][0]['data']
 
     """
         Allows you to vote on items. Should work for classes to, though has only been tested with groups.
@@ -1155,8 +1162,8 @@ class Edsby(object):
             'filedata': '',
             'files': '',
         }
-            TODO - Edsby complains of an invalid key when attempting to upload. Suspect form data formatting in POST.
     """
+
     def postFileInGroupFeed(self, groupNID, message, fileName, filePath):
         uploadData = {
             '_formkey': self.studentData['formkey'],
@@ -1182,9 +1189,6 @@ class Edsby(object):
             'social-tools-addresources-linkRich': response['nid']
         }
         return requests.post('https://'+self.edsbyHost+'/core/create/'+str(groupNID)+'?xds=feedmsg&xdsr=PlaceFeed&rxdstype=ref&noDirtyForm=true',data=messageSubmission,cookies=self.getCookies(),headers=self.getHeaders()).json()['slice']['slices'][0]['data']['item']
-            
-
-        
 
     """
         Deletes specified post in a group. 
@@ -1208,8 +1212,106 @@ class Edsby(object):
     """
         Returns all moderators of a specified group.
     """
-    def getGroupModerators(self , groupNID):
+    def getGroupModerators(self, groupNID):
         return self.getRawGroupData(groupNID)['data']['col1']['moderators']
+
+    """
+        Posts a poll in the group feed. This takes a dict called message, which looks like this:
+        {
+            "question": "Which fruit do you prefer?",
+            "choices": ["apples", "oranges"],
+            "showResults": ""
+        }
+        Set "showResults" to "1" for results to be publicly visible.
+
+        It can also post files with the poll, pass the fileName and filePath variables to do so.
+    """
+    def postPollInGroupFeed(self, groupNID, pollData, fileName="", filePath=""):
+        choices = dict()
+
+        body = {
+            "_formkey": self.studentData['formkey'],
+            "poll-enum": str(choices),
+            "poll-question": str(pollData["question"]),
+            "showResults": str(pollData["showResults"]),
+            "file-linkFiles": "",
+            "file-linkRich": "",
+            "nodesubtype": 48,
+            "nodetype": 6,
+            "pin": "8",
+            "file-integrations-integrationfiledata": "pin:2",
+            "file-integrations-integrationfiles": ""
+        }
+
+        if len(fileName) > 0 and len(filePath) > 0:
+            uploadData = {
+                '_formkey': self.studentData['formkey'],
+                'name': fileName,
+                'nodetype': '5.9',
+                'pin': '2'
+            }
+            
+            files=[('upload',(fileName,open(filePath,'rb'),'application/octet-stream'))]
+            
+            response = requests.post('https://'+self.edsbyHost+'/core/create.json/tmp?xds=MultiFileUploaderNoThumbnailing&nodetype=5.9&temp=tmp',files=files, data=uploadData,cookies=self.getCookies(),headers=self.getHeaders()).json()
+
+            body.update({
+                "file-linkFiles": response['nid'],
+                "file-linkRich": response['nid']
+            })
+        else:
+            body.update({
+                "file-linkFiles": "",
+                "file-linkRich": ""
+            })
+
+        for i in range(0, len(pollData["choices"])):
+            body[str(i)] = str(pollData["choices"][i])
+            choices[str(i + 1)] = str(pollData["choices"][i])
+        body["poll-enum"] = str(json.dumps(choices))
+        return requests.post('https://'+self.edsbyHost+'/core/create/'+str(groupNID)+'?xds=CreatePoll&xdsr=PlaceFeed&rxdstype=ref&validate=poll',data=body, cookies=self.getCookies(),headers=self.getHeaders()).json()
+
+    """
+        Posts a reply to a message in the group feed. This takes a dict called message, which looks like this:
+        {
+            'text': '<the message text>',
+            'url': '<an optional URL, shows up as a hyperlink in Edsby>',
+            'pin': 8,
+            'nodetype': 4,
+            'node_subtype': 23,
+            'filedata': '',
+            'files': '',
+            'parent_nid': <parent feed item NID>,
+            'parent_rid': <parent feed item RID>
+        }
+    """
+    def postReplyInGroupFeed(self, groupNID, message):
+        messageSubmission = {
+            '_formkey': self.studentData['formkey'],
+            'body-pin': message['pin'], # 8
+            'body-shmart-nodetype': message['nodetype'], # 4
+            'body-shmart-nodesubtype': message['node_subtype'], # 23
+            'body-shmart-body-body': message['text'],
+            'body-shmart-url': message['url'],
+            'body-tools-addresources-integrations-integrationfiledata': message['filedata'],
+            'body-tools-addresources-integrations-integrationfiles': message['files'],
+            'replyToNode': message['parent_nid'],
+            'thread': message['parent_nid']
+        }
+        return requests.post('https://'+self.edsbyHost+'/core/create/'+str(groupNID)+'/'+str(message['parent_rid'])+'/'+str(groupNID)+'?xds=feedreply&xdsr=CourseFeed&__delegated=CourseFeed',data=messageSubmission,cookies=self.getCookies(),headers=self.getHeaders()).json()
+
+    """
+        Invites a user to a group. Accepts group NID and a list of user NIDs.
+    """
+    def inviteUsersToGroup(self, groupNID, usersNID):
+        body = {
+            "_dest": groupNID,
+            "_formkey": self.studentData['formkey'],
+            "pending": '1',
+            
+            "body-members": usersNID
+        }
+        return requests.post('https://'+self.edsbyHost+'/core/link/'+str(usersNID.replace(",", "."))+'?xds=PlacesInvite&_processed=true',data=body, cookies=self.getCookies(),headers=self.getHeaders()).json()
 
 class Error(Exception):
     pass
